@@ -13,17 +13,20 @@ const WIDTH = canvas.width;   // 600
 const HEIGHT = canvas.height; // 450
 
 
-// Load the nut ball image
-const nutImage = new Image();
-nutImage.src = "https://e7.pngegg.com/pngimages/588/84/png-clipart-plants-vs-zombies-2-it-s-about-time-plants-vs-zombies-garden-warfare-2-nut-plants-vs-zombies-face-food.png";
+// Load the wallnut ball image
+const wallnutImage = new Image();
+wallnutImage.src = "https://plantsvszombies.fandom.com/wiki/Wall-nut?file=WallNutHD.png";
 
 // ============================================================
 // GAME STATE
 // ============================================================
-let lives = 3;
+let lives = 1;
 let score = 0;
 let gameOverPause = 0;  // counts down when showing game over message
 const GAME_OVER_PAUSE_DURATION = 120;  // frames (2 seconds at 60fps)
+
+let countdown = 180;  // 3 second countdown (3 seconds * 60 fps)
+let isCountingDown = true;
 
 // ============================================================
 // THE BALL
@@ -93,11 +96,22 @@ document.addEventListener("keyup", function (event) {
 // what they touched.
 // ============================================================
 function update() {
+  // Handle countdown
+  if (isCountingDown) {
+    countdown--;
+    if (countdown <= 0) {
+      isCountingDown = false;
+    }
+    return;  // Don't update game during countdown
+  }
+
   // If we're showing game over message, count down
   if (gameOverPause > 0) {
     gameOverPause--;
     if (gameOverPause === 0) {
-      // Game over pause finished - reset everything
+      // Game over pause finished - start countdown for next round
+      isCountingDown = true;
+      countdown = 180;  // 3 second countdown
       lives--;
       if (lives > 0) {
         resetBall();
@@ -154,19 +168,26 @@ function draw() {
   ctx.fillStyle = "#FFD700";
   ctx.fillRect(paddle.x, paddle.y, paddle.width, paddle.height);
 
-  // Draw ball as nut image (or fallback square if image not loaded)
-  if (nutImage.complete && nutImage.naturalHeight !== 0) {
-    ctx.drawImage(nutImage, ball.x, ball.y, ball.width, ball.height);
+  // Draw ball as wallnut image (or fallback square if image not loaded)
+  if (wallnutImage.complete && wallnutImage.naturalHeight !== 0) {
+    ctx.drawImage(wallnutImage, ball.x, ball.y, ball.width, ball.height);
   } else {
-    // Fallback: brown square
-    ctx.fillStyle = "#8B4513";
+    // Fallback: tan/beige square for wallnut
+    ctx.fillStyle = "#D2B48C";
     ctx.fillRect(ball.x, ball.y, ball.width, ball.height);
+    ctx.fillStyle = "#8B7355";
+    ctx.strokeRect(ball.x, ball.y, ball.width, ball.height);
   }
 
   drawBricks();  // bricks.js
 
   // Draw HUD (score and lives)
   drawHUD();
+
+  // Draw countdown if active
+  if (isCountingDown) {
+    drawCountdown();
+  }
 
   // Draw game over message if needed
   if (gameOverPause > 0) {
@@ -182,6 +203,18 @@ function drawHUD() {
   ctx.fillText("Score: " + score, 10, 40);
 }
 
+function drawCountdown() {
+  const secondsLeft = Math.ceil(countdown / 60);
+  
+  ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+  ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+  ctx.fillStyle = "#FFD700";
+  ctx.font = "bold 72px Arial";
+  ctx.textAlign = "center";
+  ctx.fillText(secondsLeft, WIDTH / 2, HEIGHT / 2);
+}
+
 function drawGameOverMessage() {
   // Semi-transparent dark overlay
   ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
@@ -193,16 +226,10 @@ function drawGameOverMessage() {
   ctx.textAlign = "center";
   ctx.fillText("GAME OVER!", WIDTH / 2, HEIGHT / 2 - 40);
 
-  // Show remaining lives
-  if (lives > 0) {
-    ctx.fillStyle = "white";
-    ctx.font = "24px Arial";
-    ctx.fillText("Lives remaining: " + lives, WIDTH / 2, HEIGHT / 2 + 40);
-  } else {
-    ctx.fillStyle = "#FF6B6B";
-    ctx.font = "24px Arial";
-    ctx.fillText("YOU LOST!", WIDTH / 2, HEIGHT / 2 + 40);
-  }
+  // Show game ended message
+  ctx.fillStyle = "white";
+  ctx.font = "24px Arial";
+  ctx.fillText("No more lives!", WIDTH / 2, HEIGHT / 2 + 40);
 }
 
 
@@ -237,6 +264,8 @@ function frame(now) {
 function start() {
   bricks = makeBricks();  // bricks.js
   resetBall();
+  isCountingDown = true;
+  countdown = 180;  // 3 second countdown to start
   lastTime = performance.now();
   requestAnimationFrame(frame);
 }
