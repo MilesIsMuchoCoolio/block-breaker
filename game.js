@@ -1,5 +1,5 @@
 // ============================================================
-// BLOCK BREAKER (base game)
+// BLOCK BREAKER (Plants vs Zombies Edition)
 //
 // game.js  = the canvas, the ball, the paddle, and the game loop
 // bricks.js     = where the bricks are and how they are drawn
@@ -13,19 +13,31 @@ const WIDTH = canvas.width;   // 600
 const HEIGHT = canvas.height; // 450
 
 
-// ------------------------------------------------------------
+// Load the nut ball image
+const nutImage = new Image();
+nutImage.src = "https://e7.pngegg.com/pngimages/588/84/png-clipart-plants-vs-zombies-2-it-s-about-time-plants-vs-zombies-garden-warfare-2-nut-plants-vs-zombies-face-food.png";
+
+// ============================================================
+// GAME STATE
+// ============================================================
+let lives = 3;
+let score = 0;
+let gameOverPause = 0;  // counts down when showing game over message
+const GAME_OVER_PAUSE_DURATION = 120;  // frames (2 seconds at 60fps)
+
+// ============================================================
 // THE BALL
 // x and y are the top-left corner. vx and vy are how many pixels
 // the ball moves each update (vx = sideways, vy = up/down).
 // A positive vy means the ball is moving DOWN the screen.
-// ------------------------------------------------------------
+// ============================================================
 const BALL_SPEED = 4;
 
 const ball = {
   x: 0,
   y: 0,
-  width: 12,
-  height: 12,
+  width: 30,
+  height: 30,
   vx: 0,
   vy: 0
 };
@@ -39,9 +51,9 @@ function resetBall() {
 }
 
 
-// ------------------------------------------------------------
-// THE PADDLE
-// ------------------------------------------------------------
+// ============================================================
+// THE PADDLE (Sunflower)
+// ============================================================
 const paddle = {
   x: WIDTH / 2 - 45,
   y: HEIGHT - 30,
@@ -51,16 +63,16 @@ const paddle = {
 };
 
 
-// ------------------------------------------------------------
+// ============================================================
 // THE BRICKS (the list is filled in by makeBricks() in bricks.js)
-// ------------------------------------------------------------
+// ============================================================
 let bricks = [];
 
 
-// ------------------------------------------------------------
+// ============================================================
 // KEYBOARD
 // keys["arrowleft"] is true while the left arrow is held down.
-// ------------------------------------------------------------
+// ============================================================
 const keys = {};
 
 document.addEventListener("keydown", function (event) {
@@ -76,11 +88,24 @@ document.addEventListener("keyup", function (event) {
 });
 
 
-// ------------------------------------------------------------
+// ============================================================
 // UPDATE: runs 60 times every second. Move things, then check
 // what they touched.
-// ------------------------------------------------------------
+// ============================================================
 function update() {
+  // If we're showing game over message, count down
+  if (gameOverPause > 0) {
+    gameOverPause--;
+    if (gameOverPause === 0) {
+      // Game over pause finished - reset everything
+      lives--;
+      if (lives > 0) {
+        resetBall();
+      }
+    }
+    return;  // Don't update game while showing game over
+  }
+
   movePaddle();
   moveBall();
 
@@ -88,9 +113,9 @@ function update() {
   bounceOffPaddle();  // collisions.js
   bounceOffBricks();  // collisions.js
 
-  // The ball fell off the bottom: back to the center.
+  // The ball fell off the bottom: loss of life
   if (ball.y > HEIGHT) {
-    resetBall();
+    gameOverPause = GAME_OVER_PAUSE_DURATION;
   }
 }
 
@@ -117,28 +142,76 @@ function moveBall() {
 }
 
 
-// ------------------------------------------------------------
-// DRAW: paints everything on the canvas. Black background,
-// white shapes.
-// ------------------------------------------------------------
+// ============================================================
+// DRAW: paints everything on the canvas with PvZ theme
+// ============================================================
 function draw() {
-  ctx.fillStyle = "black";
+  // PvZ themed background (dark green)
+  ctx.fillStyle = "#1a472a";
   ctx.fillRect(0, 0, WIDTH, HEIGHT);
 
-  ctx.fillStyle = "white";
+  // Draw paddle (Sunflower)
+  ctx.fillStyle = "#FFD700";
   ctx.fillRect(paddle.x, paddle.y, paddle.width, paddle.height);
-  ctx.fillRect(ball.x, ball.y, ball.width, ball.height);
+
+  // Draw ball as nut image (or fallback square if image not loaded)
+  if (nutImage.complete && nutImage.naturalHeight !== 0) {
+    ctx.drawImage(nutImage, ball.x, ball.y, ball.width, ball.height);
+  } else {
+    // Fallback: brown square
+    ctx.fillStyle = "#8B4513";
+    ctx.fillRect(ball.x, ball.y, ball.width, ball.height);
+  }
 
   drawBricks();  // bricks.js
+
+  // Draw HUD (score and lives)
+  drawHUD();
+
+  // Draw game over message if needed
+  if (gameOverPause > 0) {
+    drawGameOverMessage();
+  }
+}
+
+function drawHUD() {
+  ctx.fillStyle = "white";
+  ctx.font = "14px Arial";
+  ctx.textAlign = "left";
+  ctx.fillText("Lives: " + lives, 10, 20);
+  ctx.fillText("Score: " + score, 10, 40);
+}
+
+function drawGameOverMessage() {
+  // Semi-transparent dark overlay
+  ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
+  ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+  // Game Over text
+  ctx.fillStyle = "#FF6B6B";
+  ctx.font = "bold 48px Arial";
+  ctx.textAlign = "center";
+  ctx.fillText("GAME OVER!", WIDTH / 2, HEIGHT / 2 - 40);
+
+  // Show remaining lives
+  if (lives > 0) {
+    ctx.fillStyle = "white";
+    ctx.font = "24px Arial";
+    ctx.fillText("Lives remaining: " + lives, WIDTH / 2, HEIGHT / 2 + 40);
+  } else {
+    ctx.fillStyle = "#FF6B6B";
+    ctx.font = "24px Arial";
+    ctx.fillText("YOU LOST!", WIDTH / 2, HEIGHT / 2 + 40);
+  }
 }
 
 
-// ------------------------------------------------------------
+// ============================================================
 // THE GAME LOOP
 // The browser calls frame() every time it is ready to draw.
 // Some screens are faster than others, so we make sure update()
 // always runs exactly 60 times per second on every computer.
-// ------------------------------------------------------------
+// ============================================================
 const STEP = 1000 / 60;
 let lastTime = 0;
 let leftover = 0;
