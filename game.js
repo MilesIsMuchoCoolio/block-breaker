@@ -14,20 +14,20 @@ wallnutImage.src =
   "https://plantsvszombies.fandom.com/wiki/Wall-nut?file=WallNutHD.png";
 
 let score = 0;
-let gameOverPause = 0;
-const GAME_OVER_PAUSE_DURATION = 120;
+let level = 1;
+let isGameOver = false;
 
 let countdown = 180;
 let isCountingDown = true;
-let isGameOver = false;
 
 const BALL_SPEED = 4;
 
+// Ball is now 6px to match the BRICK_GAP of 6px
 const ball = {
   x: 0,
   y: 0,
-  width: 15,
-  height: 15,
+  width: 6,
+  height: 6,
   vx: 0,
   vy: 0
 };
@@ -39,13 +39,24 @@ function resetBall() {
   ball.vy = BALL_SPEED;
 }
 
-function resetGame() {
-  score = 0;
-  isGameOver = false;
-  gameOverPause = 0;
+function nextLevel() {
+  level++;
+  score += 100 * level;
   isCountingDown = true;
   countdown = 180;
   bricks = makeBricks();
+  powerUps = [];
+  resetBall();
+}
+
+function resetGame() {
+  score = 0;
+  level = 1;
+  isGameOver = false;
+  isCountingDown = true;
+  countdown = 180;
+  bricks = makeBricks();
+  powerUps = [];
   resetBall();
 }
 
@@ -58,6 +69,18 @@ const paddle = {
 };
 
 let bricks = [];
+
+// Power-ups
+let powerUps = [];
+
+const POWER_UP_TYPES = {
+  SLOW: { symbol: "S", color: "#00BFFF", effect: "Slow ball" },
+  WIDE: { symbol: "W", color: "#32CD32", effect: "Wide paddle" },
+  FAST: { symbol: "F", color: "#FF4500", effect: "Fast ball" }
+};
+
+// 30% chance of power-up when brick is destroyed
+const POWER_UP_CHANCE = 0.3;
 
 const keys = {};
 
@@ -96,9 +119,17 @@ function update() {
   bounceOffWalls();
   bounceOffPaddle();
   bounceOffBricks();
+  
+  updatePowerUps();
+  checkPowerUpCollision();
 
   if (ball.y > HEIGHT) {
     isGameOver = true;
+  }
+
+  // Check if all bricks are destroyed
+  if (bricks.length === 0) {
+    nextLevel();
   }
 }
 
@@ -123,11 +154,53 @@ function moveBall() {
   ball.y += ball.vy;
 }
 
+function updatePowerUps() {
+  for (let i = powerUps.length - 1; i >= 0; i--) {
+    powerUps[i].y += 2; // Fall down
+    
+    if (powerUps[i].y > HEIGHT) {
+      powerUps.splice(i, 1);
+    }
+  }
+}
+
+function checkPowerUpCollision() {
+  for (let i = powerUps.length - 1; i >= 0; i--) {
+    const powerUp = powerUps[i];
+    
+    if (
+      powerUp.x < paddle.x + paddle.width &&
+      powerUp.x + powerUp.width > paddle.x &&
+      powerUp.y < paddle.y + paddle.height &&
+      powerUp.y + powerUp.height > paddle.y
+    ) {
+      activatePowerUp(powerUp.type);
+      powerUps.splice(i, 1);
+    }
+  }
+}
+
+function activatePowerUp(type) {
+  if (type === "SLOW") {
+    ball.vx *= 0.7;
+    ball.vy *= 0.7;
+  } else if (type === "WIDE") {
+    paddle.width = Math.min(paddle.width + 30, 150);
+    setTimeout(() => {
+      paddle.width = 90;
+    }, 5000);
+  } else if (type === "FAST") {
+    ball.vx *= 1.5;
+    ball.vy *= 1.5;
+  }
+}
+
 function drawHUD() {
   ctx.fillStyle = "white";
   ctx.font = "14px Arial";
   ctx.textAlign = "left";
-  ctx.fillText("Score: " + score, 10, 20);
+  ctx.fillText("Level: " + level, 10, 20);
+  ctx.fillText("Score: " + score, 10, 40);
 }
 
 function drawCountdown() {
@@ -140,6 +213,10 @@ function drawCountdown() {
   ctx.font = "bold 72px Arial";
   ctx.textAlign = "center";
   ctx.fillText(secondsLeft, WIDTH / 2, HEIGHT / 2);
+  
+  ctx.fillStyle = "white";
+  ctx.font = "20px Arial";
+  ctx.fillText("Level " + level, WIDTH / 2, HEIGHT / 2 + 50);
 }
 
 function drawGameOverScreen() {
@@ -149,15 +226,28 @@ function drawGameOverScreen() {
   ctx.fillStyle = "#FF6B6B";
   ctx.font = "bold 48px Arial";
   ctx.textAlign = "center";
-  ctx.fillText("GAME OVER!", WIDTH / 2, HEIGHT / 2 - 60);
+  ctx.fillText("GAME OVER!", WIDTH / 2, HEIGHT / 2 - 80);
 
   ctx.fillStyle = "white";
   ctx.font = "24px Arial";
-  ctx.fillText("Score: " + score, WIDTH / 2, HEIGHT / 2);
+  ctx.fillText("Final Level: " + level, WIDTH / 2, HEIGHT / 2 - 20);
+  ctx.fillText("Score: " + score, WIDTH / 2, HEIGHT / 2 + 20);
 
   ctx.fillStyle = "#FFD700";
   ctx.font = "20px Arial";
-  ctx.fillText("Press R to Restart", WIDTH / 2, HEIGHT / 2 + 60);
+  ctx.fillText("Press R to Restart", WIDTH / 2, HEIGHT / 2 + 80);
+}
+
+function drawPowerUps() {
+  for (const powerUp of powerUps) {
+    ctx.fillStyle = powerUp.color;
+    ctx.fillRect(powerUp.x, powerUp.y, powerUp.width, powerUp.height);
+    
+    ctx.fillStyle = "black";
+    ctx.font = "bold 12px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText(powerUp.symbol, powerUp.x + powerUp.width / 2, powerUp.y + powerUp.height / 2 + 4);
+  }
 }
 
 function draw() {
@@ -176,6 +266,7 @@ function draw() {
   }
 
   drawBricks();
+  drawPowerUps();
   drawHUD();
 
   if (isCountingDown) {
