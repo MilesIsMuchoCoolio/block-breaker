@@ -79,6 +79,9 @@ function bounceOffBricks() {
     // Remove the brick that was touched
     bricks.splice(i, 1);
 
+    // Add to score
+    score += 10;
+
     break;  // bounce off one brick per update, then stop looking
   }
 }
