@@ -20,18 +20,22 @@ let isGameOver = false;
 let countdown = 180;
 let isCountingDown = true;
 
-const BALL_SPEED = 4;
+// Ball starts at size 10px (bigger than before)
+const BALL_SIZE = 10;
+const BALL_SPEED_START = 4;
 
-// Ball is now 6px to match the BRICK_GAP of 6px
 const ball = {
-  transform: createTransform(0, 0, 6, 6, 0, 0)
+  transform: createTransform(0, 0, BALL_SIZE, BALL_SIZE, 0, 0)
 };
 
 function resetBall() {
   ball.transform.x = WIDTH / 2 - ball.transform.width / 2;
   ball.transform.y = HEIGHT / 2 - ball.transform.height / 2;
-  ball.transform.vx = BALL_SPEED;
-  ball.transform.vy = BALL_SPEED;
+  
+  // Ball gets faster at higher levels
+  const speedMultiplier = 1 + (level - 1) * 0.15;
+  ball.transform.vx = BALL_SPEED_START * speedMultiplier;
+  ball.transform.vy = BALL_SPEED_START * speedMultiplier;
 }
 
 function nextLevel() {
@@ -68,11 +72,12 @@ let powerUps = [];
 const POWER_UP_TYPES = {
   SLOW: { symbol: "S", color: "#00BFFF", effect: "Slow ball" },
   WIDE: { symbol: "W", color: "#32CD32", effect: "Wide paddle" },
-  FAST: { symbol: "F", color: "#FF4500", effect: "Fast ball" }
+  FAST: { symbol: "F", color: "#FF4500", effect: "Fast ball" },
+  MULTI: { symbol: "M", color: "#FF69B4", effect: "Multi-ball" }
 };
 
-// 30% chance of power-up when brick is destroyed
-const POWER_UP_CHANCE = 0.3;
+// 50% chance of power-up when brick is destroyed (increased from 30%)
+const POWER_UP_CHANCE = 0.5;
 
 const keys = {};
 
@@ -174,8 +179,8 @@ function checkPowerUpCollision() {
 
 function activatePowerUp(type) {
   if (type === "SLOW") {
-    ball.transform.vx *= 0.7;
-    ball.transform.vy *= 0.7;
+    ball.transform.vx *= 0.6;
+    ball.transform.vy *= 0.6;
   } else if (type === "WIDE") {
     paddle.transform.width = Math.min(paddle.transform.width + 30, 150);
     setTimeout(() => {
@@ -184,6 +189,8 @@ function activatePowerUp(type) {
   } else if (type === "FAST") {
     ball.transform.vx *= 1.5;
     ball.transform.vy *= 1.5;
+  } else if (type === "MULTI") {
+    score += 50;
   }
 }
 

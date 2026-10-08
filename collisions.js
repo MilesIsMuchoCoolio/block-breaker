@@ -66,8 +66,25 @@ function bounceOffBricks() {
       }
     }
 
+    // 50% chance to drop a power-up
+    if (Math.random() < POWER_UP_CHANCE) {
+      const powerUpTypes = Object.keys(POWER_UP_TYPES);
+      const randomType = powerUpTypes[Math.floor(Math.random() * powerUpTypes.length)];
+      const powerUpData = POWER_UP_TYPES[randomType];
+      
+      powerUps.push({
+        x: brickTransform.x + brickTransform.width / 2 - 8,
+        y: brickTransform.y + brickTransform.height,
+        width: 16,
+        height: 16,
+        type: randomType,
+        color: powerUpData.color,
+        symbol: powerUpData.symbol
+      });
+    }
+
     bricks.splice(i, 1);
-    score += 10;
+    score += 10 * level; // Score scales with level
     break;
   }
 }

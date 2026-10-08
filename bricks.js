@@ -3,11 +3,18 @@
 // ============================================================
 
 const BRICK_COLUMNS = 8;
-const BRICK_ROWS = 4;
 const BRICK_WIDTH = 60;
 const BRICK_HEIGHT = 20;
 const BRICK_GAP = 6;
 const BRICKS_TOP = 50;
+
+// More rows at higher levels = harder gameplay
+function getBrickRows() {
+  if (level <= 2) return 4;
+  if (level <= 5) return 5;
+  if (level <= 8) return 6;
+  return 7; // Max 7 rows
+}
 
 const zombieColors = [
   "#4A7C59",
@@ -18,10 +25,11 @@ const zombieColors = [
 
 function makeBricks() {
   const list = [];
+  const brickRows = getBrickRows();
   const totalWidth = BRICK_COLUMNS * BRICK_WIDTH + (BRICK_COLUMNS - 1) * BRICK_GAP;
   const left = (WIDTH - totalWidth) / 2;
 
-  for (let row = 0; row < BRICK_ROWS; row++) {
+  for (let row = 0; row < brickRows; row++) {
     for (let col = 0; col < BRICK_COLUMNS; col++) {
       list.push({
         transform: createTransform(
