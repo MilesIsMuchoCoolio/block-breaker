@@ -24,10 +24,12 @@ function makeBricks() {
   for (let row = 0; row < BRICK_ROWS; row++) {
     for (let col = 0; col < BRICK_COLUMNS; col++) {
       list.push({
-        x: left + col * (BRICK_WIDTH + BRICK_GAP),
-        y: BRICKS_TOP + row * (BRICK_HEIGHT + BRICK_GAP),
-        width: BRICK_WIDTH,
-        height: BRICK_HEIGHT,
+        transform: createTransform(
+          left + col * (BRICK_WIDTH + BRICK_GAP),
+          BRICKS_TOP + row * (BRICK_HEIGHT + BRICK_GAP),
+          BRICK_WIDTH,
+          BRICK_HEIGHT
+        ),
         colorIndex: (row + col) % zombieColors.length
       });
     }
@@ -38,31 +40,33 @@ function makeBricks() {
 
 function drawBricks() {
   for (const brick of bricks) {
+    const brickTransform = brick.transform || brick;
+
     ctx.fillStyle = zombieColors[brick.colorIndex];
-    ctx.fillRect(brick.x, brick.y, brick.width, brick.height);
+    ctx.fillRect(brickTransform.x, brickTransform.y, brickTransform.width, brickTransform.height);
 
     ctx.fillStyle = "white";
-    const eyeY = brick.y + brick.height / 3;
+    const eyeY = brickTransform.y + brickTransform.height / 3;
     ctx.beginPath();
-    ctx.arc(brick.x + brick.width * 0.3, eyeY, 3, 0, Math.PI * 2);
+    ctx.arc(brickTransform.x + brickTransform.width * 0.3, eyeY, 3, 0, Math.PI * 2);
     ctx.fill();
     ctx.beginPath();
-    ctx.arc(brick.x + brick.width * 0.7, eyeY, 3, 0, Math.PI * 2);
+    ctx.arc(brickTransform.x + brickTransform.width * 0.7, eyeY, 3, 0, Math.PI * 2);
     ctx.fill();
 
     ctx.fillStyle = "#000";
     ctx.beginPath();
-    ctx.arc(brick.x + brick.width * 0.3, eyeY, 1.5, 0, Math.PI * 2);
+    ctx.arc(brickTransform.x + brickTransform.width * 0.3, eyeY, 1.5, 0, Math.PI * 2);
     ctx.fill();
     ctx.beginPath();
-    ctx.arc(brick.x + brick.width * 0.7, eyeY, 1.5, 0, Math.PI * 2);
+    ctx.arc(brickTransform.x + brickTransform.width * 0.7, eyeY, 1.5, 0, Math.PI * 2);
     ctx.fill();
 
     ctx.strokeStyle = "#000";
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.moveTo(brick.x + brick.width * 0.2, brick.y + brick.height * 0.7);
-    ctx.lineTo(brick.x + brick.width * 0.8, brick.y + brick.height * 0.7);
+    ctx.moveTo(brickTransform.x + brickTransform.width * 0.2, brickTransform.y + brickTransform.height * 0.7);
+    ctx.lineTo(brickTransform.x + brickTransform.width * 0.8, brickTransform.y + brickTransform.height * 0.7);
     ctx.stroke();
   }
 }

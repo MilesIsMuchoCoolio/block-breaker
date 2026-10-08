@@ -24,19 +24,14 @@ const BALL_SPEED = 4;
 
 // Ball is now 6px to match the BRICK_GAP of 6px
 const ball = {
-  x: 0,
-  y: 0,
-  width: 6,
-  height: 6,
-  vx: 0,
-  vy: 0
+  transform: createTransform(0, 0, 6, 6, 0, 0)
 };
 
 function resetBall() {
-  ball.x = WIDTH / 2 - ball.width / 2;
-  ball.y = HEIGHT / 2 - ball.height / 2;
-  ball.vx = BALL_SPEED;
-  ball.vy = BALL_SPEED;
+  ball.transform.x = WIDTH / 2 - ball.transform.width / 2;
+  ball.transform.y = HEIGHT / 2 - ball.transform.height / 2;
+  ball.transform.vx = BALL_SPEED;
+  ball.transform.vy = BALL_SPEED;
 }
 
 function nextLevel() {
@@ -61,10 +56,7 @@ function resetGame() {
 }
 
 const paddle = {
-  x: WIDTH / 2 - 45,
-  y: HEIGHT - 30,
-  width: 90,
-  height: 12,
+  transform: createTransform(WIDTH / 2 - 45, HEIGHT - 30, 90, 12),
   speed: 6
 };
 
@@ -119,11 +111,11 @@ function update() {
   bounceOffWalls();
   bounceOffPaddle();
   bounceOffBricks();
-  
+
   updatePowerUps();
   checkPowerUpCollision();
 
-  if (ball.y > HEIGHT) {
+  if (ball.transform.y > HEIGHT) {
     isGameOver = true;
   }
 
@@ -135,29 +127,29 @@ function update() {
 
 function movePaddle() {
   if (keys["arrowleft"] || keys["a"]) {
-    paddle.x -= paddle.speed;
+    paddle.transform.x -= paddle.speed;
   }
   if (keys["arrowright"] || keys["d"]) {
-    paddle.x += paddle.speed;
+    paddle.transform.x += paddle.speed;
   }
 
-  if (paddle.x < 0) {
-    paddle.x = 0;
+  if (paddle.transform.x < 0) {
+    paddle.transform.x = 0;
   }
-  if (paddle.x + paddle.width > WIDTH) {
-    paddle.x = WIDTH - paddle.width;
+  if (paddle.transform.x + paddle.transform.width > WIDTH) {
+    paddle.transform.x = WIDTH - paddle.transform.width;
   }
 }
 
 function moveBall() {
-  ball.x += ball.vx;
-  ball.y += ball.vy;
+  ball.transform.x += ball.transform.vx;
+  ball.transform.y += ball.transform.vy;
 }
 
 function updatePowerUps() {
   for (let i = powerUps.length - 1; i >= 0; i--) {
     powerUps[i].y += 2; // Fall down
-    
+
     if (powerUps[i].y > HEIGHT) {
       powerUps.splice(i, 1);
     }
@@ -167,12 +159,12 @@ function updatePowerUps() {
 function checkPowerUpCollision() {
   for (let i = powerUps.length - 1; i >= 0; i--) {
     const powerUp = powerUps[i];
-    
+
     if (
-      powerUp.x < paddle.x + paddle.width &&
-      powerUp.x + powerUp.width > paddle.x &&
-      powerUp.y < paddle.y + paddle.height &&
-      powerUp.y + powerUp.height > paddle.y
+      powerUp.x < paddle.transform.x + paddle.transform.width &&
+      powerUp.x + powerUp.width > paddle.transform.x &&
+      powerUp.y < paddle.transform.y + paddle.transform.height &&
+      powerUp.y + powerUp.height > paddle.transform.y
     ) {
       activatePowerUp(powerUp.type);
       powerUps.splice(i, 1);
@@ -182,16 +174,16 @@ function checkPowerUpCollision() {
 
 function activatePowerUp(type) {
   if (type === "SLOW") {
-    ball.vx *= 0.7;
-    ball.vy *= 0.7;
+    ball.transform.vx *= 0.7;
+    ball.transform.vy *= 0.7;
   } else if (type === "WIDE") {
-    paddle.width = Math.min(paddle.width + 30, 150);
+    paddle.transform.width = Math.min(paddle.transform.width + 30, 150);
     setTimeout(() => {
-      paddle.width = 90;
+      paddle.transform.width = 90;
     }, 5000);
   } else if (type === "FAST") {
-    ball.vx *= 1.5;
-    ball.vy *= 1.5;
+    ball.transform.vx *= 1.5;
+    ball.transform.vy *= 1.5;
   }
 }
 
@@ -213,7 +205,7 @@ function drawCountdown() {
   ctx.font = "bold 72px Arial";
   ctx.textAlign = "center";
   ctx.fillText(secondsLeft, WIDTH / 2, HEIGHT / 2);
-  
+
   ctx.fillStyle = "white";
   ctx.font = "20px Arial";
   ctx.fillText("Level " + level, WIDTH / 2, HEIGHT / 2 + 50);
@@ -242,7 +234,7 @@ function drawPowerUps() {
   for (const powerUp of powerUps) {
     ctx.fillStyle = powerUp.color;
     ctx.fillRect(powerUp.x, powerUp.y, powerUp.width, powerUp.height);
-    
+
     ctx.fillStyle = "black";
     ctx.font = "bold 12px Arial";
     ctx.textAlign = "center";
@@ -255,14 +247,14 @@ function draw() {
   ctx.fillRect(0, 0, WIDTH, HEIGHT);
 
   ctx.fillStyle = "#FFD700";
-  ctx.fillRect(paddle.x, paddle.y, paddle.width, paddle.height);
+  ctx.fillRect(paddle.transform.x, paddle.transform.y, paddle.transform.width, paddle.transform.height);
 
   if (wallnutImage.complete && wallnutImage.naturalHeight !== 0) {
-    ctx.drawImage(wallnutImage, ball.x, ball.y, ball.width, ball.height);
+    ctx.drawImage(wallnutImage, ball.transform.x, ball.transform.y, ball.transform.width, ball.transform.height);
   } else {
     ctx.fillStyle = "#D2B48C";
-    ctx.fillRect(ball.x, ball.y, ball.width, ball.height);
-    ctx.strokeRect(ball.x, ball.y, ball.width, ball.height);
+    ctx.fillRect(ball.transform.x, ball.transform.y, ball.transform.width, ball.transform.height);
+    ctx.strokeRect(ball.transform.x, ball.transform.y, ball.transform.width, ball.transform.height);
   }
 
   drawBricks();

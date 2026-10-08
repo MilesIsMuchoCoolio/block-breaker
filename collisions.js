@@ -1,61 +1,68 @@
 function boxesTouch(a, b) {
+  const aTransform = a.transform || a;
+  const bTransform = b.transform || b;
+
   return (
-    a.x < b.x + b.width &&
-    a.x + a.width > b.x &&
-    a.y < b.y + b.height &&
-    a.y + a.height > b.y
+    aTransform.x < bTransform.x + bTransform.width &&
+    aTransform.x + aTransform.width > bTransform.x &&
+    aTransform.y < bTransform.y + bTransform.height &&
+    aTransform.y + aTransform.height > bTransform.y
   );
 }
 
 function bounceOffWalls() {
-  if (ball.x < 0) {
-    ball.x = 0;
-    ball.vx = -ball.vx;
+  const ballTransform = ball.transform;
+
+  if (ballTransform.x < 0) {
+    ballTransform.x = 0;
+    ballTransform.vx = -ballTransform.vx;
   }
-  if (ball.x + ball.width > WIDTH) {
-    ball.x = WIDTH - ball.width;
-    ball.vx = -ball.vx;
+  if (ballTransform.x + ballTransform.width > WIDTH) {
+    ballTransform.x = WIDTH - ballTransform.width;
+    ballTransform.vx = -ballTransform.vx;
   }
-  if (ball.y < 0) {
-    ball.y = 0;
-    ball.vy = -ball.vy;
+  if (ballTransform.y < 0) {
+    ballTransform.y = 0;
+    ballTransform.vy = -ballTransform.vy;
   }
 }
 
 function bounceOffPaddle() {
-  if (boxesTouch(ball, paddle) && ball.vy > 0) {
-    ball.y = paddle.y - ball.height;
-    ball.vy = -ball.vy;
+  if (boxesTouch(ball, paddle) && ball.transform.vy > 0) {
+    ball.transform.y = paddle.transform.y - ball.transform.height;
+    ball.transform.vy = -ball.transform.vy;
   }
 }
 
 function bounceOffBricks() {
   for (let i = 0; i < bricks.length; i++) {
     const brick = bricks[i];
+    const brickTransform = brick.transform || brick;
+
     if (!boxesTouch(ball, brick)) {
       continue;
     }
 
     const overlapX =
-      Math.min(ball.x + ball.width, brick.x + brick.width) -
-      Math.max(ball.x, brick.x);
+      Math.min(ball.transform.x + ball.transform.width, brickTransform.x + brickTransform.width) -
+      Math.max(ball.transform.x, brickTransform.x);
     const overlapY =
-      Math.min(ball.y + ball.height, brick.y + brick.height) -
-      Math.max(ball.y, brick.y);
+      Math.min(ball.transform.y + ball.transform.height, brickTransform.y + brickTransform.height) -
+      Math.max(ball.transform.y, brickTransform.y);
 
     if (overlapX < overlapY) {
-      ball.vx = -ball.vx;
-      if (ball.x < brick.x) {
-        ball.x = brick.x - ball.width;
+      ball.transform.vx = -ball.transform.vx;
+      if (ball.transform.x < brickTransform.x) {
+        ball.transform.x = brickTransform.x - ball.transform.width;
       } else {
-        ball.x = brick.x + brick.width;
+        ball.transform.x = brickTransform.x + brickTransform.width;
       }
     } else {
-      ball.vy = -ball.vy;
-      if (ball.y < brick.y) {
-        ball.y = brick.y - ball.height;
+      ball.transform.vy = -ball.transform.vy;
+      if (ball.transform.y < brickTransform.y) {
+        ball.transform.y = brickTransform.y - ball.transform.height;
       } else {
-        ball.y = brick.y + brick.height;
+        ball.transform.y = brickTransform.y + brickTransform.height;
       }
     }
 
