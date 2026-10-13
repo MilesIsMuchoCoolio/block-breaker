@@ -25,17 +25,19 @@ const BALL_SIZE = 10;
 const BALL_SPEED_START = 4;
 
 const ball = {
-  transform: createTransform(0, 0, BALL_SIZE, BALL_SIZE, 0, 0)
+  transform: createTransform(0, 0, BALL_SIZE, BALL_SIZE, 0, 0),
+  isGlue: false
 };
 
 function resetBall() {
   ball.transform.x = WIDTH / 2 - ball.transform.width / 2;
   ball.transform.y = HEIGHT / 2 - ball.transform.height / 2;
 
-  // Ball gets faster at higher levels
+  // Ball starts straight down, not slanted to the right
   const speedMultiplier = 1 + (level - 1) * 0.15;
-  ball.transform.vx = BALL_SPEED_START * speedMultiplier;
+  ball.transform.vx = 0;
   ball.transform.vy = BALL_SPEED_START * speedMultiplier;
+  ball.isGlue = false;
 }
 
 function nextLevel() {
@@ -45,6 +47,14 @@ function nextLevel() {
   countdown = 180;
   bricks = makeBricks();
   powerUps = [];
+  glueMode = false;
+  if (glueIntervalId) {
+    clearInterval(glueIntervalId);
+    glueIntervalId = null;
+  }
+  glueProjectiles = [];
+  glueMessage = "";
+  glueMessageTimer = 0;
   resetBall();
 }
 
@@ -56,6 +66,14 @@ function resetGame() {
   countdown = 180;
   bricks = makeBricks();
   powerUps = [];
+  glueMode = false;
+  if (glueIntervalId) {
+    clearInterval(glueIntervalId);
+    glueIntervalId = null;
+  }
+  glueProjectiles = [];
+  glueMessage = "";
+  glueMessageTimer = 0;
   resetBall();
 }
 
@@ -73,13 +91,20 @@ const POWER_UP_TYPES = {
   SLOW: { symbol: "S", color: "#00BFFF", effect: "Slow ball" },
   WIDE: { symbol: "W", color: "#32CD32", effect: "Wide paddle" },
   FAST: { symbol: "F", color: "#FF4500", effect: "Fast ball" },
-  MULTI: { symbol: "M", color: "#FF69B4", effect: "Multi-ball" }
+  MULTI: { symbol: "M", color: "#FF69B4", effect: "Multi-ball" },
+  GLUE: { symbol: "GL", color: "#ffffff", effect: "Glue mode" }
 };
 
 // 50% chance of power-up when brick is destroyed (increased from 30%)
 const POWER_UP_CHANCE = 0.5;
 
 const keys = {};
+
+let glueMode = false;
+let glueIntervalId = null;
+let glueProjectiles = [];
+let glueMessage = "";
+let glueMessageTimer = 0;
 
 document.addEventListener("keydown", function (event) {
   keys[event.key.toLowerCase()] = true;
@@ -119,6 +144,10 @@ function update() {
 
   updatePowerUps();
   checkPowerUpCollision();
+
+  if (glueMode) {
+    updateGlueProjectiles();
+  }
 
   if (ball.transform.y > HEIGHT) {
     isGameOver = true;
@@ -177,6 +206,68 @@ function checkPowerUpCollision() {
   }
 }
 
+function spawnGlueSquirt() {
+  const x = 20 + Math.random() * (WIDTH - 40);
+  const y = BRICKS_TOP - 8;
+
+  glueProjectiles.push({
+    x: x - 4,
+    y: y,
+    width: 8,
+    height: 12,
+    vx: 0,
+    vy: 2.2
+  });
+}
+
+function updateGlueProjectiles() {
+  for (let i = glueProjectiles.length - 1; i >= 0; i--) {
+    const p = glueProjectiles[i];
+    p.x += p.vx;
+    p.y += p.vy;
+
+    if (p.y > HEIGHT) {
+      glueProjectiles.splice(i, 1);
+      continue;
+    }
+
+    for (let j = 0; j < bricks.length; j++) {
+      const brick = bricks[j];
+      const brickTransform = brick.transform || brick;
+
+      if (
+        p.x < brickTransform.x + brickTransform.width &&
+        p.x + p.width > brickTransform.x &&
+        p.y < brickTransform.y + brickTransform.height &&
+        p.y + p.height > brickTransform.y
+      ) {
+        if (typeof handleBrickHit === "function") {
+          handleBrickHit(j);
+        } else {
+          bricks.splice(j, 1);
+          score += 10 * level;
+        }
+        glueProjectiles.splice(i, 1);
+        break;
+      }
+    }
+  }
+}
+
+function drawGlueProjectiles() {
+  for (const p of glueProjectiles) {
+    ctx.fillStyle = "#C17C4F";
+    ctx.beginPath();
+    ctx.ellipse(p.x + p.width / 2, p.y + p.height / 2, p.width / 2, p.height / 2, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = "#fff";
+    ctx.font = "8px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText("'", p.x + p.width / 2, p.y + 4);
+  }
+}
+
 function activatePowerUp(type) {
   if (type === "SLOW") {
     ball.transform.vx *= 0.6;
@@ -191,6 +282,19 @@ function activatePowerUp(type) {
     ball.transform.vy *= 1.5;
   } else if (type === "MULTI") {
     score += 50;
+  } else if (type === "GLUE") {
+    if (glueIntervalId) {
+      clearInterval(glueIntervalId);
+      glueIntervalId = null;
+    }
+
+    glueMode = true;
+    ball.isGlue = true;
+    glueMessage = "Glue mode activate.";
+    glueMessageTimer = 180;
+
+    spawnGlueSquirt();
+    glueIntervalId = setInterval(spawnGlueSquirt, 3000);
   }
 }
 
@@ -244,9 +348,6 @@ function drawPowerUps() {
     ctx.arc(powerUp.x + powerUp.width / 2, powerUp.y + powerUp.height / 2, powerUp.width / 2, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.fillStyle = "white";
-    ctx.strokeStyle = "white";
-    ctx.lineWidth = 2;
     const cx = powerUp.x + powerUp.width / 2;
     const cy = powerUp.y + powerUp.height / 2;
 
@@ -285,6 +386,15 @@ function drawPowerUps() {
       ctx.arc(cx + 5, cy, 3, 0, Math.PI * 2);
       ctx.arc(cx, cy - 5, 3, 0, Math.PI * 2);
       ctx.fill();
+    } else if (powerUp.type === "GLUE") {
+      ctx.fillStyle = "#c2a27f";
+      ctx.fillRect(cx - 4, cy - 3, 8, 10);
+      ctx.fillStyle = "#a8876a";
+      ctx.fillRect(cx - 2, cy - 7, 4, 4);
+      ctx.fillStyle = "#fff";
+      ctx.font = "8px Arial";
+      ctx.textAlign = "center";
+      ctx.fillText("G", cx, cy + 4);
     } else {
       ctx.fillStyle = "black";
       ctx.font = "bold 12px Arial";
@@ -301,7 +411,12 @@ function draw() {
   ctx.fillStyle = "#FFD700";
   ctx.fillRect(paddle.transform.x, paddle.transform.y, paddle.transform.width, paddle.transform.height);
 
-  if (wallnutImage.complete && wallnutImage.naturalHeight !== 0) {
+  if (ball.isGlue) {
+    ctx.fillStyle = "#FFFFFF";
+    ctx.fillRect(ball.transform.x, ball.transform.y, ball.transform.width, ball.transform.height);
+    ctx.strokeStyle = "#DDD";
+    ctx.strokeRect(ball.transform.x, ball.transform.y, ball.transform.width, ball.transform.height);
+  } else if (wallnutImage.complete && wallnutImage.naturalHeight !== 0) {
     ctx.drawImage(wallnutImage, ball.transform.x, ball.transform.y, ball.transform.width, ball.transform.height);
   } else {
     ctx.fillStyle = "#D2B48C";
@@ -311,6 +426,22 @@ function draw() {
 
   drawBricks();
   drawPowerUps();
+
+  if (glueMode) {
+    drawGlueProjectiles();
+  }
+
+  if (glueMessageTimer > 0 && glueMessage) {
+    ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
+    ctx.font = "18px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText(glueMessage, WIDTH / 2, 30);
+    glueMessageTimer--;
+    if (glueMessageTimer <= 0) {
+      glueMessage = "";
+    }
+  }
+
   drawHUD();
 
   if (isCountingDown) {
