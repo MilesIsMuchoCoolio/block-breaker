@@ -106,7 +106,111 @@ let glueProjectiles = [];
 let glueMessage = "";
 let glueMessageTimer = 0;
 
-document.addEventListener("keydown", function (event) {
+// small helper: spawn a single glue projectile from the ball targeting a living brick
+function spawnGlueSquirt() {
+  if (!bricks || bricks.length === 0) return;
+
+  // choose a random living brick as target
+  const targetIndex = Math.floor(Math.random() * bricks.length);
+  const target = bricks[targetIndex];
+  if (!target) return;
+
+  const targetTransform = target.transform || target;
+
+  // start from ball center
+  const startX = ball.transform.x + ball.transform.width / 2;
+  const startY = ball.transform.y + ball.transform.height / 2;
+
+  // target center
+  const tx = targetTransform.x + targetTransform.width / 2;
+  const ty = targetTransform.y + targetTransform.height / 2;
+
+  // direction vector
+  let dx = tx - startX;
+  let dy = ty - startY;
+  const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+  dx /= dist;
+  dy /= dist;
+
+  const speed = 3.0; // glue squirts a bit faster
+
+  glueProjectiles.push({
+    x: startX - 4,
+    y: startY - 4,
+    width: 8,
+    height: 8,
+    vx: dx * speed,
+    vy: dy * speed,
+    targetIndex: targetIndex
+  });
+}
+
+function updateGlueProjectiles() {
+  for (let i = glueProjectiles.length - 1; i >= 0; i--) {
+    const p = glueProjectiles[i];
+    p.x += p.vx;
+    p.y += p.vy;
+
+    // off-screen check
+    if (p.y > HEIGHT || p.y < -20 || p.x < -20 || p.x > WIDTH + 20) {
+      glueProjectiles.splice(i, 1);
+      continue;
+    }
+
+    // check collision with bricks (prefer the targeted brick if still alive)
+    const tryIndexes = [p.targetIndex];
+    for (let j = 0; j < bricks.length; j++) {
+      if (j !== p.targetIndex) tryIndexes.push(j);
+    }
+
+    let hit = false;
+    for (const j of tryIndexes) {
+      if (j < 0 || j >= bricks.length) continue;
+      const brick = bricks[j];
+      const b = brick.transform || brick;
+      if (
+        p.x < b.x + b.width &&
+        p.x + p.width > b.x &&
+        p.y < b.y + b.height &&
+        p.y + p.height > b.y
+      ) {
+        // hit
+        if (typeof handleBrickHit === "function") {
+          handleBrickHit(j);
+        } else {
+          bricks.splice(j, 1);
+          score += 10 * level;
+        }
+
+        // show fun message
+        glueMessage = "get squirted on bozo";
+        glueMessageTimer = 120; // 2 seconds
+
+        glueProjectiles.splice(i, 1);
+        hit = true;
+        break;
+      }
+    }
+
+    if (hit) continue;
+  }
+}
+
+function drawGlueProjectiles() {
+  for (const p of glueProjectiles) {
+    // white glue squirt projectile
+    ctx.fillStyle = "#FFFFFF";
+    ctx.beginPath();
+    ctx.ellipse(p.x + p.width / 2, p.y + p.height / 2, p.width / 2, p.height / 2, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // small shine
+    ctx.fillStyle = "rgba(255,255,255,0.8)";
+    ctx.fillRect(p.x + p.width / 4, p.y + 1, 2, 2);
+  }
+}
+
+function documentKeyHandler(event) {
   keys[event.key.toLowerCase()] = true;
   if (event.key.startsWith("Arrow")) {
     event.preventDefault();
@@ -115,7 +219,9 @@ document.addEventListener("keydown", function (event) {
   if (isGameOver && event.key.toLowerCase() === "r") {
     resetGame();
   }
-});
+}
+
+document.addEventListener("keydown", documentKeyHandler);
 
 document.addEventListener("keyup", function (event) {
   keys[event.key.toLowerCase()] = false;
@@ -206,68 +312,6 @@ function checkPowerUpCollision() {
   }
 }
 
-function spawnGlueSquirt() {
-  const x = 20 + Math.random() * (WIDTH - 40);
-  const y = BRICKS_TOP - 8;
-
-  glueProjectiles.push({
-    x: x - 4,
-    y: y,
-    width: 8,
-    height: 12,
-    vx: 0,
-    vy: 2.2
-  });
-}
-
-function updateGlueProjectiles() {
-  for (let i = glueProjectiles.length - 1; i >= 0; i--) {
-    const p = glueProjectiles[i];
-    p.x += p.vx;
-    p.y += p.vy;
-
-    if (p.y > HEIGHT) {
-      glueProjectiles.splice(i, 1);
-      continue;
-    }
-
-    for (let j = 0; j < bricks.length; j++) {
-      const brick = bricks[j];
-      const brickTransform = brick.transform || brick;
-
-      if (
-        p.x < brickTransform.x + brickTransform.width &&
-        p.x + p.width > brickTransform.x &&
-        p.y < brickTransform.y + brickTransform.height &&
-        p.y + p.height > brickTransform.y
-      ) {
-        if (typeof handleBrickHit === "function") {
-          handleBrickHit(j);
-        } else {
-          bricks.splice(j, 1);
-          score += 10 * level;
-        }
-        glueProjectiles.splice(i, 1);
-        break;
-      }
-    }
-  }
-}
-
-function drawGlueProjectiles() {
-  for (const p of glueProjectiles) {
-    ctx.fillStyle = "#C17C4F";
-    ctx.beginPath();
-    ctx.ellipse(p.x + p.width / 2, p.y + p.height / 2, p.width / 2, p.height / 2, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.fillStyle = "#fff";
-    ctx.font = "8px Arial";
-    ctx.textAlign = "center";
-    ctx.fillText("'", p.x + p.width / 2, p.y + 4);
-  }
-}
-
 function activatePowerUp(type) {
   if (type === "SLOW") {
     ball.transform.vx *= 0.6;
@@ -293,6 +337,7 @@ function activatePowerUp(type) {
     glueMessage = "Glue mode activate.";
     glueMessageTimer = 180;
 
+    // spawn immediately and then every 3s
     spawnGlueSquirt();
     glueIntervalId = setInterval(spawnGlueSquirt, 3000);
   }
