@@ -66,12 +66,35 @@ function bounceOffBricks() {
       }
     }
 
+    // Helmet handling: cone and bucket protect the brick for one or two hits
+    if (brick.helmet) {
+      const h = brick.helmet;
+      if (h.type === 'cone' && h.stage === 0) {
+        // cone absorbs first hit, then is removed
+        h.stage = 1; // removed
+        break; // stop processing further bricks this frame
+      }
+
+      if (h.type === 'bucket') {
+        if (h.stage === 0) {
+          // bucket intact -> becomes damaged
+          h.stage = 1; // damaged
+          break;
+        } else if (h.stage === 1) {
+          // damaged -> bucket falls off
+          h.stage = 2; // removed
+          break;
+        }
+      }
+    }
+
+    // No helmet (or helmet already removed) -> brick is destroyed
     // 50% chance to drop a power-up
     if (Math.random() < POWER_UP_CHANCE) {
       const powerUpTypes = Object.keys(POWER_UP_TYPES);
       const randomType = powerUpTypes[Math.floor(Math.random() * powerUpTypes.length)];
       const powerUpData = POWER_UP_TYPES[randomType];
-      
+
       powerUps.push({
         x: brickTransform.x + brickTransform.width / 2 - 8,
         y: brickTransform.y + brickTransform.height,
