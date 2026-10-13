@@ -28,9 +28,26 @@ function bounceOffWalls() {
 }
 
 function bounceOffPaddle() {
+  // When the ball hits the paddle, change horizontal velocity based on hit position
   if (boxesTouch(ball, paddle) && ball.transform.vy > 0) {
+    // place ball on top of paddle to avoid sticking
     ball.transform.y = paddle.transform.y - ball.transform.height;
-    ball.transform.vy = -ball.transform.vy;
+
+    // Compute hit position relative to paddle center: -1 (left edge) .. 0 (center) .. 1 (right edge)
+    const ballCenterX = ball.transform.x + ball.transform.width / 2;
+    const paddleCenterX = paddle.transform.x + paddle.transform.width / 2;
+    let relative = (ballCenterX - paddleCenterX) / (paddle.transform.width / 2);
+    relative = Math.max(-1, Math.min(1, relative));
+
+    // Desired speed magnitude (respect level scaling). Use current speed if it's faster than base.
+    const baseSpeed = BALL_SPEED_START * (1 + (level - 1) * 0.15);
+    const currentSpeed = Math.sqrt(ball.transform.vx * ball.transform.vx + ball.transform.vy * ball.transform.vy);
+    const speed = Math.max(currentSpeed, baseSpeed);
+
+    // Map relative to horizontal velocity, then compute vertical velocity to keep overall speed
+    ball.transform.vx = relative * speed;
+    const vyAbs = Math.sqrt(Math.max(0.1, speed * speed - ball.transform.vx * ball.transform.vx));
+    ball.transform.vy = -vyAbs; // send upward
   }
 }
 
@@ -66,35 +83,12 @@ function bounceOffBricks() {
       }
     }
 
-    // Helmet handling: cone and bucket protect the brick for one or two hits
-    if (brick.helmet) {
-      const h = brick.helmet;
-      if (h.type === 'cone' && h.stage === 0) {
-        // cone absorbs first hit, then is removed
-        h.stage = 1; // removed
-        break; // stop processing further bricks this frame
-      }
-
-      if (h.type === 'bucket') {
-        if (h.stage === 0) {
-          // bucket intact -> becomes damaged
-          h.stage = 1; // damaged
-          break;
-        } else if (h.stage === 1) {
-          // damaged -> bucket falls off
-          h.stage = 2; // removed
-          break;
-        }
-      }
-    }
-
-    // No helmet (or helmet already removed) -> brick is destroyed
     // 50% chance to drop a power-up
     if (Math.random() < POWER_UP_CHANCE) {
       const powerUpTypes = Object.keys(POWER_UP_TYPES);
       const randomType = powerUpTypes[Math.floor(Math.random() * powerUpTypes.length)];
       const powerUpData = POWER_UP_TYPES[randomType];
-
+      
       powerUps.push({
         x: brickTransform.x + brickTransform.width / 2 - 8,
         y: brickTransform.y + brickTransform.height,
