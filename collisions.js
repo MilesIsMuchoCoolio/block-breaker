@@ -52,7 +52,8 @@ function bounceOffPaddle() {
 }
 
 function bounceOffBricks() {
-  for (let i = 0; i < bricks.length; i++) {
+  // iterate backwards to avoid index issues when splicing
+  for (let i = bricks.length - 1; i >= 0; i--) {
     const brick = bricks[i];
     const brickTransform = brick.transform || brick;
 
@@ -83,25 +84,35 @@ function bounceOffBricks() {
       }
     }
 
-    // 50% chance to drop a power-up
-    if (Math.random() < POWER_UP_CHANCE) {
-      const powerUpTypes = Object.keys(POWER_UP_TYPES);
-      const randomType = powerUpTypes[Math.floor(Math.random() * powerUpTypes.length)];
-      const powerUpData = POWER_UP_TYPES[randomType];
-      
-      powerUps.push({
-        x: brickTransform.x + brickTransform.width / 2 - 8,
-        y: brickTransform.y + brickTransform.height,
-        width: 16,
-        height: 16,
-        type: randomType,
-        color: powerUpData.color,
-        symbol: powerUpData.symbol
-      });
+    // Try to spawn a power-up safely: guard against missing config or runtime errors
+    try {
+      if (typeof POWER_UP_CHANCE !== 'undefined' && Math.random() < POWER_UP_CHANCE) {
+        if (typeof POWER_UP_TYPES === 'object' && Object.keys(POWER_UP_TYPES).length > 0) {
+          const powerUpTypes = Object.keys(POWER_UP_TYPES);
+          const randomType = powerUpTypes[Math.floor(Math.random() * powerUpTypes.length)];
+          const powerUpData = POWER_UP_TYPES[randomType] || {};
+
+          powerUps.push({
+            x: brickTransform.x + brickTransform.width / 2 - 8,
+            y: brickTransform.y + brickTransform.height,
+            width: 16,
+            height: 16,
+            type: randomType,
+            color: powerUpData.color || '#999',
+            symbol: powerUpData.symbol || '?'
+          });
+        }
+      }
+    } catch (e) {
+      // swallow errors here so a bad power-up config doesn't stop the game
+      console.warn('Power-up spawn error:', e);
     }
 
+    // remove the brick and award score
     bricks.splice(i, 1);
     score += 10 * level; // Score scales with level
+
+    // stop after handling one brick collision this frame
     break;
   }
 }
