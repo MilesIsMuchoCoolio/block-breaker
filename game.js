@@ -36,18 +36,29 @@ let gambleSelected = null;         // picks the power-up type after reveal
 let gambleAnimationStep = 0;       // animation counter
 let gambleRevealTimer = 0;         // shows revealed item for a short time
 
-// Cost scales with level (50 * level), but not below 50
+// Cost fixed to 150
 function getGambleCost() {
-  return Math.max(50, 50 * level);
+  return 150;
 }
 
-// Loot table with rarities (percent chances)
+// New power-up list (includes new "MEGA" overpowered item)
+const POWER_UP_TYPES = {
+  MULTI: { symbol: "M", color: "#FF69B4", effect: "Multi-ball: temporary extra balls" },
+  LASER: { symbol: "L", color: "#FF4500", effect: "Laser: paddle fires a burst that damages bricks" },
+  SHIELD: { symbol: "S", color: "#1E90FF", effect: "Shield: prevents 1 lost ball" },
+  TIME:  { symbol: "T", color: "#00BFFF", effect: "Time Slow: slow ball for a short while" },
+  SPLIT: { symbol: "P", color: "#FFD700", effect: "Split: current ball splits into multiple balls" },
+  MEGA:  { symbol: "X", color: "#FF0000", effect: "MEGA: huge temporary buff (very rare)" }
+};
+
+// Weighted loot table (percent-ish; sums to 100)
 const LOOT_TABLE = [
-  { type: "SLOW",  chance: 40 }, // common
-  { type: "WIDE",  chance: 25 }, // uncommon
-  { type: "FAST",  chance: 15 }, // rare-ish
-  { type: "MULTI", chance: 15 }, // rare-ish
-  { type: "GLUE",  chance: 5 }   // very rare / powerful
+  { type: "MULTI", chance: 30 },
+  { type: "LASER", chance: 22 },
+  { type: "SHIELD", chance: 18 },
+  { type: "TIME",  chance: 15 },
+  { type: "SPLIT", chance: 12 },
+  { type: "MEGA",  chance: 3  } // very rare
 ];
 
 // Helper: pick one entry from LOOT_TABLE by weighted chance
@@ -60,6 +71,11 @@ function pickLoot() {
   }
   return LOOT_TABLE[LOOT_TABLE.length - 1].type;
 }
+
+// Timers for some temporary effects
+let shieldHits = 0;
+let timeSlowTimeoutId = null;
+let paddleRestoreTimeoutId = null;
 
 function resetBall() {
   ball.transform.x = WIDTH / 2 - ball.transform.width / 2;
@@ -116,19 +132,10 @@ const paddle = {
 
 let bricks = [];
 
-// Power-ups
+// Power-ups (in-world drops) kept for compatibility but not used directly by loot
 let powerUps = [];
 
-const POWER_UP_TYPES = {
-  SLOW: { symbol: "S", color: "#00BFFF", effect: "Slow ball" },
-  WIDE: { symbol: "W", color: "#32CD32", effect: "Wide paddle" },
-  FAST: { symbol: "F", color: "#FF4500", effect: "Fast ball" },
-  MULTI: { symbol: "M", color: "#FF69B4", effect: "Multi-ball" },
-  GLUE: { symbol: "GL", color: "#ffffff", effect: "Glue mode" }
-};
-
-// 50% chance of power-up when brick is destroyed (increased from 30%)
-const POWER_UP_CHANCE = 0.5;
+// old POWER_UP constants removed; new ones live in POWER_UP_TYPES
 
 const keys = {};
 
@@ -278,7 +285,7 @@ canvas.addEventListener("click", function (evt) {
     if (score >= cost) {
       startGamble(cost);
     } else {
-      // not enough score; maybe play a small shake or message
+      // not enough score; show a small message
       glueMessage = "Not enough score to open chest";
       glueMessageTimer = 120;
     }
@@ -302,6 +309,11 @@ function update() {
 
   if (isGambleScreen) {
     // pause gameplay while the gamble UI is visible
+    // allow gamble animation to progress separately
+    if (gambleInProgress) {
+      gambleAnimationStep++;
+    }
+    if (gambleRevealTimer > 0) gambleRevealTimer--;
     return;
   }
 
@@ -329,7 +341,16 @@ function update() {
   }
 
   if (ball.transform.y > HEIGHT) {
-    isGameOver = true;
+    if (shieldHits > 0) {
+      // consume shield and reflect ball
+      shieldHits--;
+      ball.transform.y = paddle.transform.y - ball.transform.height;
+      ball.transform.vy = -Math.abs(ball.transform.vy);
+      glueMessage = "Shield absorbed a miss!";
+      glueMessageTimer = 90;
+    } else {
+      isGameOver = true;
+    }
   }
 
   // Check if all bricks are destroyed -> show gamble screen instead of immediately advancing
@@ -391,33 +412,66 @@ function checkPowerUpCollision() {
 }
 
 function activatePowerUp(type) {
-  if (type === "SLOW") {
+  const info = POWER_UP_TYPES[type] || { effect: "Unknown" };
+
+  // Show a popup description
+  glueMessage = `${type}: ${info.effect}`;
+  glueMessageTimer = 180;
+
+  if (type === "TIME") {
+    // slow the ball for 5s
     ball.transform.vx *= 0.6;
     ball.transform.vy *= 0.6;
-  } else if (type === "WIDE") {
-    paddle.transform.width = Math.min(paddle.transform.width + 30, 150);
-    setTimeout(() => {
-      paddle.transform.width = 90;
+    if (timeSlowTimeoutId) clearTimeout(timeSlowTimeoutId);
+    timeSlowTimeoutId = setTimeout(() => {
+      ball.transform.vx /= 0.6;
+      ball.transform.vy /= 0.6;
+      timeSlowTimeoutId = null;
     }, 5000);
-  } else if (type === "FAST") {
-    ball.transform.vx *= 1.5;
-    ball.transform.vy *= 1.5;
+  } else if (type === "SHIELD") {
+    shieldHits = Math.max(shieldHits, 1);
   } else if (type === "MULTI") {
-    score += 50;
-  } else if (type === "GLUE") {
-    if (glueIntervalId) {
-      clearInterval(glueIntervalId);
-      glueIntervalId = null;
+    // quick reward: give score and a small paddle buff
+    score += 150;
+    paddle.transform.width = Math.min(paddle.transform.width + 30, 180);
+    if (paddleRestoreTimeoutId) clearTimeout(paddleRestoreTimeoutId);
+    paddleRestoreTimeoutId = setTimeout(() => {
+      paddle.transform.width = 90;
+      paddleRestoreTimeoutId = null;
+    }, 6000);
+  } else if (type === "LASER") {
+    // make a satisfying instant effect: damage a few random bricks and give score
+    let destroyed = 0;
+    for (let i = 0; i < bricks.length && destroyed < 3; i++) {
+      const idx = Math.floor(Math.random() * bricks.length);
+      if (bricks[idx]) {
+        bricks.splice(idx, 1);
+        destroyed++;
+        score += 20 * level;
+      }
     }
-
-    glueMode = true;
-    ball.isGlue = true;
-    glueMessage = "Glue mode activate.";
-    glueMessageTimer = 180;
-
-    // spawn immediately and then every 3s
-    spawnGlueSquirt();
-    glueIntervalId = setInterval(spawnGlueSquirt, 3000);
+  } else if (type === "SPLIT") {
+    // quick reward: give score and a temporary paddle widen
+    score += 120;
+    paddle.transform.width = Math.min(paddle.transform.width + 40, 200);
+    if (paddleRestoreTimeoutId) clearTimeout(paddleRestoreTimeoutId);
+    paddleRestoreTimeoutId = setTimeout(() => {
+      paddle.transform.width = 90;
+      paddleRestoreTimeoutId = null;
+    }, 6000);
+  } else if (type === "MEGA") {
+    // mega effect: large score and multiple buffs
+    score += 800;
+    shieldHits = Math.max(shieldHits, 2);
+    paddle.transform.width = Math.min(paddle.transform.width + 80, WIDTH);
+    // slow ball a little so player enjoys the effect
+    ball.transform.vx *= 0.7;
+    ball.transform.vy *= 0.7;
+    if (paddleRestoreTimeoutId) clearTimeout(paddleRestoreTimeoutId);
+    paddleRestoreTimeoutId = setTimeout(() => {
+      paddle.transform.width = 90;
+      paddleRestoreTimeoutId = null;
+    }, 9000);
   }
 }
 
@@ -474,72 +528,55 @@ function drawPowerUps() {
     const cx = powerUp.x + powerUp.width / 2;
     const cy = powerUp.y + powerUp.height / 2;
 
-    if (powerUp.type === "WIDE") {
-      ctx.fillStyle = "white";
-      ctx.fillRect(cx - 12, cy - 4, 24, 8);
-      ctx.fillStyle = "black";
-      ctx.font = "10px Arial";
-      ctx.textAlign = "center";
-      ctx.fillText("W", cx, cy + 4);
-    } else if (powerUp.type === "SLOW") {
-      ctx.fillStyle = "white";
-      ctx.beginPath();
-      ctx.arc(cx - 2, cy, 5, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = "black";
-      ctx.beginPath();
-      ctx.arc(cx - 5, cy - 3, 1.2, 0, Math.PI * 2);
-      ctx.arc(cx - 5, cy + 1, 1.2, 0, Math.PI * 2);
-      ctx.fill();
-    } else if (powerUp.type === "FAST") {
-      ctx.fillStyle = "white";
-      ctx.beginPath();
-      ctx.moveTo(cx - 6, cy - 6);
-      ctx.lineTo(cx - 1, cy - 1);
-      ctx.lineTo(cx - 2, cy - 1);
-      ctx.lineTo(cx + 6, cy + 6);
-      ctx.lineTo(cx + 1, cy + 1);
-      ctx.lineTo(cx + 2, cy + 1);
-      ctx.closePath();
-      ctx.fill();
-    } else if (powerUp.type === "MULTI") {
-      ctx.fillStyle = "white";
-      ctx.beginPath();
-      ctx.arc(cx - 5, cy, 3, 0, Math.PI * 2);
-      ctx.arc(cx + 5, cy, 3, 0, Math.PI * 2);
-      ctx.arc(cx, cy - 5, 3, 0, Math.PI * 2);
-      ctx.fill();
-    } else if (powerUp.type === "GLUE") {
-      ctx.fillStyle = "#c2a27f";
-      ctx.fillRect(cx - 4, cy - 3, 8, 10);
-      ctx.fillStyle = "#a8876a";
-      ctx.fillRect(cx - 2, cy - 7, 4, 4);
-      ctx.fillStyle = "#fff";
-      ctx.font = "8px Arial";
-      ctx.textAlign = "center";
-      ctx.fillText("G", cx, cy + 4);
-    } else {
-      ctx.fillStyle = "black";
-      ctx.font = "bold 12px Arial";
-      ctx.textAlign = "center";
-      ctx.fillText(powerUp.symbol || "?", cx, cy + 4);
-    }
+    ctx.fillStyle = "black";
+    ctx.font = "bold 12px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText(powerUp.symbol || "?", cx, cy + 4);
   }
 }
 
-// Draw the post-level gamble UI overlay
+// Draw a clean chances bar: segmented horizontal bar with labels
+function drawChancesBar(px, py, w) {
+  const total = LOOT_TABLE.reduce((s, e) => s + e.chance, 0);
+  let x = px;
+  for (const e of LOOT_TABLE) {
+    const fraction = e.chance / total;
+    const segW = Math.max(2, Math.floor(w * fraction));
+    const info = POWER_UP_TYPES[e.type] || {};
+    ctx.fillStyle = info.color || "#888";
+    ctx.fillRect(x, py, segW, 18);
+    x += segW;
+  }
+
+  // border
+  ctx.strokeStyle = "#333";
+  ctx.strokeRect(px, py, w, 18);
+
+  // labels under the bar
+  ctx.font = "12px Arial";
+  ctx.textAlign = "left";
+  let labelX = px;
+  for (const e of LOOT_TABLE) {
+    const info = POWER_UP_TYPES[e.type] || {};
+    ctx.fillStyle = info.color || "#fff";
+    ctx.fillText(`${e.type} (${e.chance}%)`, labelX, py + 36);
+    labelX += Math.max(60, Math.floor(w * (e.chance / total)));
+  }
+}
+
+// Draw the post-level gamble UI overlay with spinning icons
 function drawGambleScreen() {
   // dark overlay
-  ctx.fillStyle = "rgba(0,0,0,0.65)";
+  ctx.fillStyle = "rgba(0,0,0,0.75)";
   ctx.fillRect(0, 0, WIDTH, HEIGHT);
 
   // Panel
   ctx.fillStyle = "#2b6f3a";
-  const panelW = 420;
-  const panelH = 260;
+  const panelW = 480;
+  const panelH = 280;
   const px = WIDTH / 2 - panelW / 2;
   const py = HEIGHT / 2 - panelH / 2;
-  roundRect(ctx, px, py, panelW, panelH, 8, true, false);
+  roundRect(ctx, px, py, panelW, panelH, 10, true, false);
 
   ctx.fillStyle = "white";
   ctx.font = "20px Arial";
@@ -551,20 +588,51 @@ function drawGambleScreen() {
   ctx.font = "16px Arial";
   ctx.fillText(`Open chest for ${cost} score`, WIDTH / 2, py + 66);
 
-  // Draw chest (simple rectangle + lid) and animate lid if in progress
-  const chestX = WIDTH / 2 - 32;
-  const chestY = py + 90;
-  // chest base
+  // center point for spinning icons
+  const centerX = WIDTH / 2;
+  const centerY = py + 130;
+  const radius = 80;
+
+  // Draw orbiting powerup icons
+  const items = LOOT_TABLE.map(e => e.type);
+  const spinSpeed = 0.12; // radians per frame
+  const baseAngle = gambleAnimationStep * spinSpeed;
+
+  for (let i = 0; i < items.length; i++) {
+    const angle = baseAngle + (i / items.length) * Math.PI * 2;
+    // if reveal and selected, move selected to center
+    let tx = centerX + Math.cos(angle) * radius;
+    let ty = centerY + Math.sin(angle) * radius;
+    const type = items[i];
+    const info = POWER_UP_TYPES[type];
+
+    // if reveal phase and this is the selected item, interpolate to center
+    if (gambleSelected && type === gambleSelected) {
+      const t = Math.min(1, gambleAnimationStep / 20);
+      tx = lerp(tx, centerX, t);
+      ty = lerp(ty, centerY, t);
+    }
+
+    // draw circle icon
+    ctx.beginPath();
+    ctx.fillStyle = info.color || "#fff";
+    ctx.arc(tx, ty, 20, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = "black";
+    ctx.font = "bold 14px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText(info.symbol || "?", tx, ty + 5);
+  }
+
+  // Chest graphic under icons
+  const chestX = centerX - 36;
+  const chestY = centerY + 50;
   ctx.fillStyle = "#8B4513";
-  ctx.fillRect(chestX, chestY, 64, 44);
+  roundRect(ctx, chestX, chestY, 72, 44, 6, true, false);
   // lid
-  ctx.save();
-  ctx.translate(chestX + 32, chestY + 6);
-  const lidOpen = gambleInProgress ? (Math.sin(gambleAnimationStep / 6) * 0.5 + 0.5) : 0;
-  ctx.rotate(-lidOpen * 0.8);
   ctx.fillStyle = "#A0522D";
-  ctx.fillRect(-36, -10, 72, 14);
-  ctx.restore();
+  roundRect(ctx, chestX - 4, chestY - 12, 80, 18, 6, true, false);
 
   // Buttons
   const buttonW = 160;
@@ -588,29 +656,24 @@ function drawGambleScreen() {
   ctx.font = "16px Arial";
   ctx.fillText("Skip (No Gamble)", WIDTH / 2, skipY + 26);
 
-  // Show loot chances
-  ctx.textAlign = "left";
-  ctx.font = "14px Arial";
-  const chanceX = px + 20;
-  let chanceY = py + 110;
-  ctx.fillStyle = "white";
-  ctx.fillText("Loot chances:", chanceX, chanceY);
-  chanceY += 22;
-  for (const e of LOOT_TABLE) {
-    const pct = e.chance + "%";
-    const info = POWER_UP_TYPES[e.type];
-    ctx.fillStyle = info.color || "#fff";
-    ctx.fillText(`${e.type} - ${pct} - ${info.effect}`, chanceX, chanceY);
-    chanceY += 18;
-  }
+  // Clean chances bar
+  drawChancesBar(px + 20, py + panelH - 74, panelW - 40);
 
-  // If gambling is in progress and we've selected an item, show it
-  if (gambleInProgress && gambleSelected) {
+  // If reveal in progress, show the selected item name and description in a popup
+  if (gambleRevealTimer > 0 && gambleSelected) {
+    const info = POWER_UP_TYPES[gambleSelected];
+    ctx.fillStyle = "rgba(0,0,0,0.6)";
+    roundRect(ctx, centerX - 160, py + panelH - 120, 320, 60, 6, true, false);
+    ctx.fillStyle = "white";
+    ctx.font = "18px Arial";
     ctx.textAlign = "center";
-    ctx.font = "22px Arial";
-    ctx.fillStyle = "#fff";
-    ctx.fillText(`You got: ${gambleSelected}`, WIDTH / 2, py + panelH - 26);
+    ctx.fillText(`${gambleSelected}: ${info.effect}`, centerX, py + panelH - 86);
   }
+}
+
+// linear interpolation helper
+function lerp(a, b, t) {
+  return a + (b - a) * t;
 }
 
 function startGamble(cost) {
@@ -621,29 +684,25 @@ function startGamble(cost) {
   gambleAnimationStep = 0;
   gambleRevealTimer = 0;
 
-  // Animation loop using interval
-  const animInterval = setInterval(() => {
-    gambleAnimationStep++;
+  // Start a short timed spin and then pick
+  const spinDurationMs = 900; // how long the spin runs before picking
+  setTimeout(() => {
+    gambleSelected = pickLoot();
+    // let animation step continue so selected item interpolates to center
+    // show reveal for 1.8s
+    gambleRevealTimer = 108; // 1.8s at 60fps
 
-    // After some steps, pick and reveal
-    if (gambleAnimationStep > 24) {
-      clearInterval(animInterval);
-      gambleSelected = pickLoot();
-      // show reveal for 90 frames (~1.5s at 60fps)
-      gambleRevealTimer = 90;
-
-      // After reveal, apply powerup and advance level
-      setTimeout(() => {
-        if (gambleSelected) {
-          activatePowerUp(gambleSelected);
-        }
-        gambleInProgress = false;
-        gambleSelected = null;
-        isGambleScreen = false;
-        nextLevel();
-      }, 1500);
-    }
-  }, 30);
+    // After reveal, apply powerup and advance level
+    setTimeout(() => {
+      if (gambleSelected) {
+        activatePowerUp(gambleSelected);
+      }
+      gambleInProgress = false;
+      gambleSelected = null;
+      isGambleScreen = false;
+      nextLevel();
+    }, 1800);
+  }, spinDurationMs);
 }
 
 function draw() {
@@ -674,7 +733,7 @@ function draw() {
   }
 
   if (glueMessageTimer > 0 && glueMessage) {
-    ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
+    ctx.fillStyle = "rgba(255, 255, 255, 0.95)";
     ctx.font = "18px Arial";
     ctx.textAlign = "center";
     ctx.fillText(glueMessage, WIDTH / 2, 30);
