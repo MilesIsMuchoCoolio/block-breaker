@@ -41,7 +41,7 @@ function getGambleCost() {
   return 150;
 }
 
-// New power-up list (includes new "MEGA" overpowered item)
+// Power-ups and weighted loot selection
 const POWER_UP_TYPES = {
   MULTI: { symbol: "M", color: "#FF69B4", effect: "Multi-ball: temporary extra balls" },
   LASER: { symbol: "L", color: "#FF4500", effect: "Laser: paddle fires a burst that damages bricks" },
@@ -51,25 +51,48 @@ const POWER_UP_TYPES = {
   MEGA:  { symbol: "X", color: "#FF0000", effect: "MEGA: huge temporary buff (very rare)" }
 };
 
-// Weighted loot table (percent-ish; sums to 100)
+const POWER_UP_DROP_CHANCE = 0.75;
+
 const LOOT_TABLE = [
-  { type: "MULTI", chance: 30 },
-  { type: "LASER", chance: 22 },
+  { type: "MULTI", chance: 22 },
+  { type: "LASER", chance: 18 },
   { type: "SHIELD", chance: 18 },
-  { type: "TIME",  chance: 15 },
-  { type: "SPLIT", chance: 12 },
-  { type: "MEGA",  chance: 3  } // very rare
+  { type: "TIME", chance: 18 },
+  { type: "SPLIT", chance: 18 },
+  { type: "MEGA", chance: 6 }
 ];
 
-// Helper: pick one entry from LOOT_TABLE by weighted chance
-function pickLoot() {
-  const total = LOOT_TABLE.reduce((s, e) => s + e.chance, 0);
-  let r = Math.random() * total;
-  for (const e of LOOT_TABLE) {
-    if (r < e.chance) return e.type;
-    r -= e.chance;
+function pickWeightedLoot() {
+  const total = LOOT_TABLE.reduce((sum, entry) => sum + entry.chance, 0);
+  let roll = Math.random() * total;
+
+  for (const entry of LOOT_TABLE) {
+    if (roll < entry.chance) {
+      return entry.type;
+    }
+    roll -= entry.chance;
   }
+
   return LOOT_TABLE[LOOT_TABLE.length - 1].type;
+}
+
+function maybeSpawnPowerUp(brickX, brickY, brickWidth, brickHeight) {
+  if (Math.random() > POWER_UP_DROP_CHANCE) {
+    return;
+  }
+
+  const type = pickWeightedLoot();
+  const powerUpData = POWER_UP_TYPES[type] || {};
+
+  powerUps.push({
+    x: brickX + brickWidth / 2 - 8,
+    y: brickY + brickHeight + 2,
+    width: 16,
+    height: 16,
+    type,
+    color: powerUpData.color || "#999",
+    symbol: powerUpData.symbol || "?"
+  });
 }
 
 // Timers for some temporary effects
@@ -387,7 +410,7 @@ function moveBall() {
 
 function updatePowerUps() {
   for (let i = powerUps.length - 1; i >= 0; i--) {
-    powerUps[i].y += 2; // Fall down
+    powerUps[i].y += 2.2; // Fall down
 
     if (powerUps[i].y > HEIGHT) {
       powerUps.splice(i, 1);
@@ -477,10 +500,10 @@ function activatePowerUp(type) {
 
 function drawHUD() {
   ctx.fillStyle = "white";
-  ctx.font = "14px Arial";
+  ctx.font = "bold 16px Arial";
   ctx.textAlign = "left";
-  ctx.fillText("Level: " + level, 10, 20);
-  ctx.fillText("Score: " + score, 10, 40);
+  ctx.fillText("Level: " + level, 16, 24);
+  ctx.fillText("Score: " + score, 16, 48);
 }
 
 function drawCountdown() {
@@ -687,7 +710,7 @@ function startGamble(cost) {
   // Start a short timed spin and then pick
   const spinDurationMs = 900; // how long the spin runs before picking
   setTimeout(() => {
-    gambleSelected = pickLoot();
+    gambleSelected = pickWeightedLoot();
     // let animation step continue so selected item interpolates to center
     // show reveal for 1.8s
     gambleRevealTimer = 108; // 1.8s at 60fps
@@ -791,3 +814,5 @@ function start() {
 }
 
 window.addEventListener("load", start);
+
+// note: collisions.js is loaded after game.js, so these global function calls are resolved at runtime
