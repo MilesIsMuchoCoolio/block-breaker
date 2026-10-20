@@ -1,172 +1,101 @@
-// ============================================================
-// bricks.js: where the bricks are, and how they are drawn
-// ============================================================
+function boxesTouch(a, b) {
+  const aTransform = a.transform || a;
+  const bTransform = b.transform || b;
 
-const BRICK_COLUMNS = 8;
-const BRICK_WIDTH = 60;
-const BRICK_HEIGHT = 20;
-const BRICK_GAP = 6;
-const BRICKS_TOP = 50;
-
-// Helmet chances (per brick)
-const HELMET_BUCKET_CHANCE = 0.08; // ~8% of bricks have a bucket
-const HELMET_CONE_CHANCE = 0.12;   // ~12% of bricks have a cone
-
-// More rows at higher levels = harder gameplay
-function getBrickRows() {
-  if (level <= 2) return 3;
-  if (level <= 5) return 4;
-  if (level <= 8) return 5;
-  return 6; // Max 6 rows
+  return (
+    aTransform.x < bTransform.x + bTransform.width &&
+    aTransform.x + aTransform.width > bTransform.x &&
+    aTransform.y < bTransform.y + bTransform.height &&
+    aTransform.y + aTransform.height > bTransform.y
+  );
 }
 
-const zombieColors = [
-  "#4A7C59",
-  "#5A8C69",
-  "#3A6C49",
-  "#6A9C79"
-];
+function bounceOffWalls() {
+  const ballTransform = ball.transform;
 
-function makeBricks() {
-  const list = [];
-  const brickRows = getBrickRows();
-  const totalWidth = BRICK_COLUMNS * BRICK_WIDTH + (BRICK_COLUMNS - 1) * BRICK_GAP;
-  const left = (WIDTH - totalWidth) / 2;
-
-  for (let row = 0; row < brickRows; row++) {
-    for (let col = 0; col < BRICK_COLUMNS; col++) {
-      // Decide whether this brick gets a helmet (bucket or cone)
-      let helmet = null;
-      const r = Math.random();
-      if (r < HELMET_BUCKET_CHANCE) {
-        helmet = { type: 'bucket', stage: 0 }; // stage: 0 = intact, 1 = damaged, 2 = removed
-      } else if (r < HELMET_BUCKET_CHANCE + HELMET_CONE_CHANCE) {
-        helmet = { type: 'cone', stage: 0 }; // stage: 0 = present, 1 = removed
-      }
-
-      list.push({
-        transform: createTransform(
-          left + col * (BRICK_WIDTH + BRICK_GAP),
-          BRICKS_TOP + row * (BRICK_HEIGHT + BRICK_GAP),
-          BRICK_WIDTH,
-          BRICK_HEIGHT
-        ),
-        colorIndex: (row + col) % zombieColors.length,
-        helmet // null or {type, stage}
-      });
-    }
+  if (ballTransform.x < 0) {
+    ballTransform.x = 0;
+    ballTransform.vx = -ballTransform.vx;
   }
-
-  return list;
+  if (ballTransform.x + ballTransform.width > WIDTH) {
+    ballTransform.x = WIDTH - ballTransform.width;
+    ballTransform.vx = -ballTransform.vx;
+  }
+  if (ballTransform.y < 0) {
+    ballTransform.y = 0;
+    ballTransform.vy = -ballTransform.vy;
+  }
 }
 
-function drawBricks() {
-  for (const brick of bricks) {
+function bounceOffPaddle() {
+  // When the ball hits the paddle, change horizontal velocity based on hit position
+  if (boxesTouch(ball, paddle) && ball.transform.vy > 0) {
+    // place ball on top of paddle to avoid sticking
+    ball.transform.y = paddle.transform.y - ball.transform.height;
+
+    // Compute hit position relative to paddle center: -1 (left edge) .. 0 (center) .. 1 (right edge)
+    const ballCenterX = ball.transform.x + ball.transform.width / 2;
+    const paddleCenterX = paddle.transform.x + paddle.transform.width / 2;
+    let relative = (ballCenterX - paddleCenterX) / (paddle.transform.width / 2);
+    relative = Math.max(-1, Math.min(1, relative));
+
+    // Desired speed magnitude (respect level scaling). Use current speed if it's faster than base.
+    const baseSpeed = BALL_SPEED_START * (1 + (level - 1) * 0.15);
+    const currentSpeed = Math.sqrt(ball.transform.vx * ball.transform.vx + ball.transform.vy * ball.transform.vy);
+    const speed = Math.max(currentSpeed, baseSpeed);
+
+    // Map relative to horizontal velocity, then compute vertical velocity to keep overall speed
+    ball.transform.vx = relative * speed;
+    const vyAbs = Math.sqrt(Math.max(0.1, speed * speed - ball.transform.vx * ball.transform.vx));
+    ball.transform.vy = -vyAbs; // send upward
+  }
+}
+
+function bounceOffBricks() {
+  // iterate backwards to avoid index issues when splicing
+  for (let i = bricks.length - 1; i >= 0; i--) {
+    const brick = bricks[i];
     const brickTransform = brick.transform || brick;
 
-    ctx.fillStyle = zombieColors[brick.colorIndex];
-    ctx.fillRect(brickTransform.x, brickTransform.y, brickTransform.width, brickTransform.height);
+    if (!boxesTouch(ball, brick)) {
+      continue;
+    }
 
-    // Eyes
-    ctx.fillStyle = "white";
-    const eyeY = brickTransform.y + brickTransform.height / 3;
-    ctx.beginPath();
-    ctx.arc(brickTransform.x + brickTransform.width * 0.3, eyeY, 3, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.arc(brickTransform.x + brickTransform.width * 0.7, eyeY, 3, 0, Math.PI * 2);
-    ctx.fill();
+    const overlapX =
+      Math.min(ball.transform.x + ball.transform.width, brickTransform.x + brickTransform.width) -
+      Math.max(ball.transform.x, brickTransform.x);
+    const overlapY =
+      Math.min(ball.transform.y + ball.transform.height, brickTransform.y + brickTransform.height) -
+      Math.max(ball.transform.y, brickTransform.y);
 
-    ctx.fillStyle = "#000";
-    ctx.beginPath();
-    ctx.arc(brickTransform.x + brickTransform.width * 0.3, eyeY, 1.5, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.arc(brickTransform.x + brickTransform.width * 0.7, eyeY, 1.5, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Mouth / line
-    ctx.strokeStyle = "#000";
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(brickTransform.x + brickTransform.width * 0.2, brickTransform.y + brickTransform.height * 0.7);
-    ctx.lineTo(brickTransform.x + brickTransform.width * 0.8, brickTransform.y + brickTransform.height * 0.7);
-    ctx.stroke();
-
-    // Draw helmet (bucket or cone) if present and not removed
-    if (brick.helmet) {
-      const h = brick.helmet;
-      const cx = brickTransform.x + brickTransform.width / 2;
-
-      if (h.type === 'cone' && h.stage === 0) {
-        // Cone: orange traffic cone shape
-        ctx.fillStyle = '#FFA500';
-        ctx.strokeStyle = '#CC8400';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(cx, brickTransform.y - 8);
-        ctx.lineTo(cx - 12, brickTransform.y + 6);
-        ctx.lineTo(cx + 12, brickTransform.y + 6);
-        ctx.closePath();
-        ctx.fill();
-        ctx.stroke();
-
-        // Cone stripe
-        ctx.fillStyle = '#FFF';
-        ctx.fillRect(cx - 6, brickTransform.y - 2, 12, 4);
+    if (overlapX < overlapY) {
+      ball.transform.vx = -ball.transform.vx;
+      if (ball.transform.x < brickTransform.x) {
+        ball.transform.x = brickTransform.x - ball.transform.width;
+      } else {
+        ball.transform.x = brickTransform.x + brickTransform.width;
       }
-
-      if (h.type === 'bucket' && h.stage < 2) {
-        // Bucket: a little metal bucket with a rim; stage 0 = intact, stage 1 = dented
-        const bw = 28;
-        const bh = 12;
-        const bx = cx - bw / 2;
-        const by = brickTransform.y - bh;
-
-        // bucket body
-        ctx.fillStyle = '#8B5A2B'; // brownish
-        ctx.strokeStyle = '#5A3E26';
-        ctx.lineWidth = 1;
-        roundRect(ctx, bx, by, bw, bh, 3, true, true);
-
-        // rim
-        ctx.fillStyle = '#A67C52';
-        ctx.fillRect(bx - 2, by - 4, bw + 4, 4);
-        ctx.strokeRect(bx - 2, by - 4, bw + 4, 4);
-
-        if (h.stage === 1) {
-          // damaged: draw a dent / crack
-          ctx.strokeStyle = '#3b2214';
-          ctx.beginPath();
-          ctx.moveTo(bx + 6, by + 4);
-          ctx.lineTo(bx + 10, by + 6);
-          ctx.lineTo(bx + 14, by + 4);
-          ctx.stroke();
-        }
+    } else {
+      ball.transform.vy = -ball.transform.vy;
+      if (ball.transform.y < brickTransform.y) {
+        ball.transform.y = brickTransform.y - ball.transform.height;
+      } else {
+        ball.transform.y = brickTransform.y + brickTransform.height;
       }
     }
-  }
-}
 
-// tiny helper to draw rounded rects
-function roundRect(ctx, x, y, width, height, radius, fill, stroke) {
-  if (typeof stroke === 'undefined') {
-    stroke = true;
+    maybeSpawnPowerUp(
+      brickTransform.x,
+      brickTransform.y,
+      brickTransform.width,
+      brickTransform.height
+    );
+
+    // remove the brick and award score
+    bricks.splice(i, 1);
+    score += 10 * level; // Score scales with level
+
+    // stop after handling one brick collision this frame
+    break;
   }
-  if (typeof radius === 'undefined') {
-    radius = 5;
-  }
-  ctx.beginPath();
-  ctx.moveTo(x + radius, y);
-  ctx.lineTo(x + width - radius, y);
-  ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
-  ctx.lineTo(x + width, y + height - radius);
-  ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
-  ctx.lineTo(x + radius, y + height);
-  ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
-  ctx.lineTo(x, y + radius);
-  ctx.quadraticCurveTo(x, y, x + radius, y);
-  ctx.closePath();
-  if (fill) ctx.fill();
-  if (stroke) ctx.stroke();
 }
