@@ -29,6 +29,8 @@ const ball = {
   isGlue: false
 };
 
+let bonusBalls = [];
+
 // --- Gambling / Loot Chest state & config ---
 let isGambleScreen = false;         // true while the post-level gamble UI is visible
 let gambleInProgress = false;      // true while chest-opening animation is running
@@ -41,8 +43,9 @@ function getGambleCost() {
   return 150;
 }
 
-// Power-ups and weighted loot selection
+// Starting power-up is speed up; the others are locked until you intentionally unlock them.
 const POWER_UP_TYPES = {
+  SPEED: { symbol: "↑", color: "#7CFC00", effect: "Speed Up: boosts the ball for a short time" },
   MULTI: { symbol: "M", color: "#FF69B4", effect: "Multi-ball: temporary extra balls" },
   LASER: { symbol: "L", color: "#FF4500", effect: "Laser: paddle fires a burst that damages bricks" },
   SHIELD: { symbol: "S", color: "#1E90FF", effect: "Shield: prevents 1 lost ball" },
@@ -51,37 +54,26 @@ const POWER_UP_TYPES = {
   MEGA:  { symbol: "X", color: "#FF0000", effect: "MEGA: huge temporary buff (very rare)" }
 };
 
-const POWER_UP_DROP_CHANCE = 0.75;
-
 const LOOT_TABLE = [
-  { type: "MULTI", chance: 22 },
-  { type: "LASER", chance: 18 },
-  { type: "SHIELD", chance: 18 },
-  { type: "TIME", chance: 18 },
-  { type: "SPLIT", chance: 18 },
-  { type: "MEGA", chance: 6 }
+  { type: "SPEED", chance: 100 }
 ];
 
-function pickWeightedLoot() {
-  const total = LOOT_TABLE.reduce((sum, entry) => sum + entry.chance, 0);
-  let roll = Math.random() * total;
-
-  for (const entry of LOOT_TABLE) {
-    if (roll < entry.chance) {
-      return entry.type;
-    }
-    roll -= entry.chance;
+function pickLoot() {
+  const total = LOOT_TABLE.reduce((s, e) => s + e.chance, 0);
+  let r = Math.random() * total;
+  for (const e of LOOT_TABLE) {
+    if (r < e.chance) return e.type;
+    r -= e.chance;
   }
-
   return LOOT_TABLE[LOOT_TABLE.length - 1].type;
 }
 
 function maybeSpawnPowerUp(brickX, brickY, brickWidth, brickHeight) {
-  if (Math.random() > POWER_UP_DROP_CHANCE) {
+  if (Math.random() > 0.7) {
     return;
   }
 
-  const type = pickWeightedLoot();
+  const type = pickLoot();
   const powerUpData = POWER_UP_TYPES[type] || {};
 
   powerUps.push({
@@ -99,16 +91,18 @@ function maybeSpawnPowerUp(brickX, brickY, brickWidth, brickHeight) {
 let shieldHits = 0;
 let timeSlowTimeoutId = null;
 let paddleRestoreTimeoutId = null;
+let speedBoostTimeoutId = null;
 
 function resetBall() {
   ball.transform.x = WIDTH / 2 - ball.transform.width / 2;
   ball.transform.y = HEIGHT / 2 - ball.transform.height / 2;
 
-  // Ball starts straight down, not slanted to the right
   const speedMultiplier = 1 + (level - 1) * 0.15;
   ball.transform.vx = 0;
   ball.transform.vy = BALL_SPEED_START * speedMultiplier;
   ball.isGlue = false;
+
+  bonusBalls = [];
 }
 
 function nextLevel() {
@@ -118,6 +112,7 @@ function nextLevel() {
   countdown = 180;
   bricks = makeBricks();
   powerUps = [];
+  bonusBalls = [];
   glueMode = false;
   if (glueIntervalId) {
     clearInterval(glueIntervalId);
@@ -137,6 +132,7 @@ function resetGame() {
   countdown = 180;
   bricks = makeBricks();
   powerUps = [];
+  bonusBalls = [];
   glueMode = false;
   if (glueIntervalId) {
     clearInterval(glueIntervalId);
@@ -154,11 +150,7 @@ const paddle = {
 };
 
 let bricks = [];
-
-// Power-ups (in-world drops) kept for compatibility but not used directly by loot
 let powerUps = [];
-
-// old POWER_UP constants removed; new ones live in POWER_UP_TYPES
 
 const keys = {};
 
@@ -168,33 +160,27 @@ let glueProjectiles = [];
 let glueMessage = "";
 let glueMessageTimer = 0;
 
-// small helper: spawn a single glue projectile from the ball targeting a living brick
 function spawnGlueSquirt() {
   if (!bricks || bricks.length === 0) return;
 
-  // choose a random living brick as target
   const targetIndex = Math.floor(Math.random() * bricks.length);
   const target = bricks[targetIndex];
   if (!target) return;
 
   const targetTransform = target.transform || target;
-
-  // start from ball center
   const startX = ball.transform.x + ball.transform.width / 2;
   const startY = ball.transform.y + ball.transform.height / 2;
 
-  // target center
   const tx = targetTransform.x + targetTransform.width / 2;
   const ty = targetTransform.y + targetTransform.height / 2;
 
-  // direction vector
   let dx = tx - startX;
   let dy = ty - startY;
   const dist = Math.sqrt(dx * dx + dy * dy) || 1;
   dx /= dist;
   dy /= dist;
 
-  const speed = 3.0; // glue squirts a bit faster
+  const speed = 3.0;
 
   glueProjectiles.push({
     x: startX - 4,
@@ -213,13 +199,11 @@ function updateGlueProjectiles() {
     p.x += p.vx;
     p.y += p.vy;
 
-    // off-screen check
     if (p.y > HEIGHT || p.y < -20 || p.x < -20 || p.x > WIDTH + 20) {
       glueProjectiles.splice(i, 1);
       continue;
     }
 
-    // check collision with bricks (prefer the targeted brick if still alive)
     const tryIndexes = [p.targetIndex];
     for (let j = 0; j < bricks.length; j++) {
       if (j !== p.targetIndex) tryIndexes.push(j);
@@ -236,7 +220,6 @@ function updateGlueProjectiles() {
         p.y < b.y + b.height &&
         p.y + p.height > b.y
       ) {
-        // hit
         if (typeof handleBrickHit === "function") {
           handleBrickHit(j);
         } else {
@@ -244,9 +227,8 @@ function updateGlueProjectiles() {
           score += 10 * level;
         }
 
-        // show fun message
         glueMessage = "get squirted on bozo";
-        glueMessageTimer = 120; // 2 seconds
+        glueMessageTimer = 120;
 
         glueProjectiles.splice(i, 1);
         hit = true;
@@ -260,13 +242,11 @@ function updateGlueProjectiles() {
 
 function drawGlueProjectiles() {
   for (const p of glueProjectiles) {
-    // white glue squirt projectile
     ctx.fillStyle = "#FFFFFF";
     ctx.beginPath();
     ctx.ellipse(p.x + p.width / 2, p.y + p.height / 2, p.width / 2, p.height / 2, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // small shine
     ctx.fillStyle = "rgba(255,255,255,0.8)";
     ctx.fillRect(p.x + p.width / 4, p.y + 1, 2, 2);
   }
@@ -285,7 +265,6 @@ function documentKeyHandler(event) {
 
 document.addEventListener("keydown", documentKeyHandler);
 
-// Mouse / click handling for gamble UI
 canvas.addEventListener("click", function (evt) {
   if (!isGambleScreen) return;
   if (gambleInProgress) return;
@@ -294,7 +273,6 @@ canvas.addEventListener("click", function (evt) {
   const x = evt.clientX - rect.left;
   const y = evt.clientY - rect.top;
 
-  // simple button bounds
   const buttonW = 160;
   const buttonH = 40;
   const openX = WIDTH / 2 - buttonW / 2;
@@ -302,19 +280,16 @@ canvas.addEventListener("click", function (evt) {
   const skipX = WIDTH / 2 - buttonW / 2;
   const skipY = HEIGHT / 2 + 110;
 
-  // Open button
   if (x >= openX && x <= openX + buttonW && y >= openY && y <= openY + buttonH) {
     const cost = getGambleCost();
     if (score >= cost) {
       startGamble(cost);
     } else {
-      // not enough score; show a small message
       glueMessage = "Not enough score to open chest";
       glueMessageTimer = 120;
     }
   }
 
-  // Skip button -> advance to next level without gambling
   if (x >= skipX && x <= skipX + buttonW && y >= skipY && y <= skipY + buttonH) {
     isGambleScreen = false;
     nextLevel();
@@ -331,8 +306,6 @@ function update() {
   }
 
   if (isGambleScreen) {
-    // pause gameplay while the gamble UI is visible
-    // allow gamble animation to progress separately
     if (gambleInProgress) {
       gambleAnimationStep++;
     }
@@ -351,6 +324,7 @@ function update() {
 
   movePaddle();
   moveBall();
+  updateBonusBalls();
 
   bounceOffWalls();
   bounceOffPaddle();
@@ -365,7 +339,6 @@ function update() {
 
   if (ball.transform.y > HEIGHT) {
     if (shieldHits > 0) {
-      // consume shield and reflect ball
       shieldHits--;
       ball.transform.y = paddle.transform.y - ball.transform.height;
       ball.transform.vy = -Math.abs(ball.transform.vy);
@@ -376,7 +349,6 @@ function update() {
     }
   }
 
-  // Check if all bricks are destroyed -> show gamble screen instead of immediately advancing
   if (bricks.length === 0) {
     isGambleScreen = true;
     gambleInProgress = false;
@@ -408,9 +380,63 @@ function moveBall() {
   ball.transform.y += ball.transform.vy;
 }
 
+function updateBonusBalls() {
+  for (let i = bonusBalls.length - 1; i >= 0; i--) {
+    const b = bonusBalls[i];
+    b.transform.x += b.transform.vx;
+    b.transform.y += b.transform.vy;
+
+    if (b.transform.x <= 0 || b.transform.x + b.transform.width >= WIDTH) {
+      b.transform.vx *= -1;
+      b.transform.x = Math.max(0, Math.min(WIDTH - b.transform.width, b.transform.x));
+    }
+    if (b.transform.y <= 0) {
+      b.transform.vy *= -1;
+      b.transform.y = 0;
+    }
+
+    if (b.transform.y + b.transform.height >= paddle.transform.y &&
+        b.transform.x + b.transform.width > paddle.transform.x &&
+        b.transform.x < paddle.transform.x + paddle.transform.width &&
+        b.transform.vy > 0) {
+      b.transform.y = paddle.transform.y - b.transform.height;
+      const ballCenterX = b.transform.x + b.transform.width / 2;
+      const paddleCenterX = paddle.transform.x + paddle.transform.width / 2;
+      const relative = Math.max(-1, Math.min(1, (ballCenterX - paddleCenterX) / (paddle.transform.width / 2)));
+      const speed = Math.max(Math.hypot(b.transform.vx, b.transform.vy), BALL_SPEED_START * 1.1);
+      b.transform.vx = relative * speed;
+      const vyAbs = Math.sqrt(Math.max(0.1, speed * speed - b.transform.vx * b.transform.vx));
+      b.transform.vy = -vyAbs;
+    }
+
+    for (let j = bricks.length - 1; j >= 0; j--) {
+      const brick = bricks[j];
+      const brickTransform = brick.transform || brick;
+      if (!boxesTouch(b, brick)) continue;
+
+      const overlapX = Math.min(b.transform.x + b.transform.width, brickTransform.x + brickTransform.width) - Math.max(b.transform.x, brickTransform.x);
+      const overlapY = Math.min(b.transform.y + b.transform.height, brickTransform.y + brickTransform.height) - Math.max(b.transform.y, brickTransform.y);
+      if (overlapX < overlapY) {
+        b.transform.vx *= -1;
+      } else {
+        b.transform.vy *= -1;
+      }
+
+      maybeSpawnPowerUp(brickTransform.x, brickTransform.y, brickTransform.width, brickTransform.height);
+      bricks.splice(j, 1);
+      score += 10 * level;
+      break;
+    }
+
+    if (b.transform.y > HEIGHT + 40) {
+      bonusBalls.splice(i, 1);
+    }
+  }
+}
+
 function updatePowerUps() {
   for (let i = powerUps.length - 1; i >= 0; i--) {
-    powerUps[i].y += 2.2; // Fall down
+    powerUps[i].y += 2.2;
 
     if (powerUps[i].y > HEIGHT) {
       powerUps.splice(i, 1);
@@ -434,62 +460,94 @@ function checkPowerUpCollision() {
   }
 }
 
+function addBallBurst(count, angleOffset = 0) {
+  const speed = Math.hypot(ball.transform.vx, ball.transform.vy) || BALL_SPEED_START;
+  const baseAngle = Math.atan2(ball.transform.vy, ball.transform.vx) || 0;
+
+  for (let i = 0; i < count; i++) {
+    const offset = (i - (count - 1) / 2) * (Math.PI / 7) + angleOffset;
+    const vx = Math.cos(baseAngle + offset) * speed;
+    const vy = Math.sin(baseAngle + offset) * speed;
+    bonusBalls.push({
+      transform: createTransform(ball.transform.x, ball.transform.y, BALL_SIZE, BALL_SIZE, vx, vy),
+      isGlue: false
+    });
+  }
+}
+
+function applySpeedBoost(multiplier, durationMs) {
+  if (speedBoostTimeoutId) {
+    clearTimeout(speedBoostTimeoutId);
+  }
+
+  const boost = multiplier;
+  ball.transform.vx *= boost;
+  ball.transform.vy *= boost;
+  for (const b of bonusBalls) {
+    b.transform.vx *= boost;
+    b.transform.vy *= boost;
+  }
+
+  speedBoostTimeoutId = setTimeout(() => {
+    ball.transform.vx /= boost;
+    ball.transform.vy /= boost;
+    for (const b of bonusBalls) {
+      b.transform.vx /= boost;
+      b.transform.vy /= boost;
+    }
+    speedBoostTimeoutId = null;
+  }, durationMs);
+}
+
 function activatePowerUp(type) {
   const info = POWER_UP_TYPES[type] || { effect: "Unknown" };
 
-  // Show a popup description
   glueMessage = `${type}: ${info.effect}`;
   glueMessageTimer = 180;
 
-  if (type === "TIME") {
-    // slow the ball for 5s
+  if (type === "SPEED") {
+    applySpeedBoost(1.35, 5000);
+  } else if (type === "TIME") {
     ball.transform.vx *= 0.6;
     ball.transform.vy *= 0.6;
+    for (const b of bonusBalls) {
+      b.transform.vx *= 0.6;
+      b.transform.vy *= 0.6;
+    }
     if (timeSlowTimeoutId) clearTimeout(timeSlowTimeoutId);
     timeSlowTimeoutId = setTimeout(() => {
       ball.transform.vx /= 0.6;
       ball.transform.vy /= 0.6;
+      for (const b of bonusBalls) {
+        b.transform.vx /= 0.6;
+        b.transform.vy /= 0.6;
+      }
       timeSlowTimeoutId = null;
     }, 5000);
   } else if (type === "SHIELD") {
     shieldHits = Math.max(shieldHits, 1);
   } else if (type === "MULTI") {
-    // quick reward: give score and a small paddle buff
+    addBallBurst(2, 0.25);
     score += 150;
-    paddle.transform.width = Math.min(paddle.transform.width + 30, 180);
-    if (paddleRestoreTimeoutId) clearTimeout(paddleRestoreTimeoutId);
-    paddleRestoreTimeoutId = setTimeout(() => {
-      paddle.transform.width = 90;
-      paddleRestoreTimeoutId = null;
-    }, 6000);
   } else if (type === "LASER") {
-    // make a satisfying instant effect: damage a few random bricks and give score
     let destroyed = 0;
     for (let i = 0; i < bricks.length && destroyed < 3; i++) {
       const idx = Math.floor(Math.random() * bricks.length);
       if (bricks[idx]) {
+        maybeSpawnPowerUp(bricks[idx].transform.x, bricks[idx].transform.y, bricks[idx].transform.width, bricks[idx].transform.height);
         bricks.splice(idx, 1);
         destroyed++;
         score += 20 * level;
       }
     }
   } else if (type === "SPLIT") {
-    // quick reward: give score and a temporary paddle widen
+    addBallBurst(3, 0.4);
     score += 120;
-    paddle.transform.width = Math.min(paddle.transform.width + 40, 200);
-    if (paddleRestoreTimeoutId) clearTimeout(paddleRestoreTimeoutId);
-    paddleRestoreTimeoutId = setTimeout(() => {
-      paddle.transform.width = 90;
-      paddleRestoreTimeoutId = null;
-    }, 6000);
   } else if (type === "MEGA") {
-    // mega effect: large score and multiple buffs
     score += 800;
     shieldHits = Math.max(shieldHits, 2);
     paddle.transform.width = Math.min(paddle.transform.width + 80, WIDTH);
-    // slow ball a little so player enjoys the effect
-    ball.transform.vx *= 0.7;
-    ball.transform.vy *= 0.7;
+    applySpeedBoost(1.25, 8000);
     if (paddleRestoreTimeoutId) clearTimeout(paddleRestoreTimeoutId);
     paddleRestoreTimeoutId = setTimeout(() => {
       paddle.transform.width = 90;
@@ -558,42 +616,17 @@ function drawPowerUps() {
   }
 }
 
-// Draw a clean chances bar: segmented horizontal bar with labels
-function drawChancesBar(px, py, w) {
-  const total = LOOT_TABLE.reduce((s, e) => s + e.chance, 0);
-  let x = px;
-  for (const e of LOOT_TABLE) {
-    const fraction = e.chance / total;
-    const segW = Math.max(2, Math.floor(w * fraction));
-    const info = POWER_UP_TYPES[e.type] || {};
-    ctx.fillStyle = info.color || "#888";
-    ctx.fillRect(x, py, segW, 18);
-    x += segW;
-  }
-
-  // border
-  ctx.strokeStyle = "#333";
-  ctx.strokeRect(px, py, w, 18);
-
-  // labels under the bar
-  ctx.font = "12px Arial";
-  ctx.textAlign = "left";
-  let labelX = px;
-  for (const e of LOOT_TABLE) {
-    const info = POWER_UP_TYPES[e.type] || {};
-    ctx.fillStyle = info.color || "#fff";
-    ctx.fillText(`${e.type} (${e.chance}%)`, labelX, py + 36);
-    labelX += Math.max(60, Math.floor(w * (e.chance / total)));
+function drawBonusBalls() {
+  for (const b of bonusBalls) {
+    ctx.fillStyle = "#FFF";
+    ctx.fillRect(b.transform.x, b.transform.y, b.transform.width, b.transform.height);
   }
 }
 
-// Draw the post-level gamble UI overlay with spinning icons
 function drawGambleScreen() {
-  // dark overlay
   ctx.fillStyle = "rgba(0,0,0,0.75)";
   ctx.fillRect(0, 0, WIDTH, HEIGHT);
 
-  // Panel
   ctx.fillStyle = "#2b6f3a";
   const panelW = 480;
   const panelH = 280;
@@ -606,37 +639,30 @@ function drawGambleScreen() {
   ctx.textAlign = "center";
   ctx.fillText("Level Cleared! Open a Loot Chest?", WIDTH / 2, py + 36);
 
-  // Show cost
   const cost = getGambleCost();
   ctx.font = "16px Arial";
   ctx.fillText(`Open chest for ${cost} score`, WIDTH / 2, py + 66);
 
-  // center point for spinning icons
   const centerX = WIDTH / 2;
   const centerY = py + 130;
   const radius = 80;
-
-  // Draw orbiting powerup icons
   const items = LOOT_TABLE.map(e => e.type);
-  const spinSpeed = 0.12; // radians per frame
+  const spinSpeed = 0.12;
   const baseAngle = gambleAnimationStep * spinSpeed;
 
   for (let i = 0; i < items.length; i++) {
     const angle = baseAngle + (i / items.length) * Math.PI * 2;
-    // if reveal and selected, move selected to center
     let tx = centerX + Math.cos(angle) * radius;
     let ty = centerY + Math.sin(angle) * radius;
     const type = items[i];
     const info = POWER_UP_TYPES[type];
 
-    // if reveal phase and this is the selected item, interpolate to center
     if (gambleSelected && type === gambleSelected) {
       const t = Math.min(1, gambleAnimationStep / 20);
       tx = lerp(tx, centerX, t);
       ty = lerp(ty, centerY, t);
     }
 
-    // draw circle icon
     ctx.beginPath();
     ctx.fillStyle = info.color || "#fff";
     ctx.arc(tx, ty, 20, 0, Math.PI * 2);
@@ -648,16 +674,13 @@ function drawGambleScreen() {
     ctx.fillText(info.symbol || "?", tx, ty + 5);
   }
 
-  // Chest graphic under icons
   const chestX = centerX - 36;
   const chestY = centerY + 50;
   ctx.fillStyle = "#8B4513";
   roundRect(ctx, chestX, chestY, 72, 44, 6, true, false);
-  // lid
   ctx.fillStyle = "#A0522D";
   roundRect(ctx, chestX - 4, chestY - 12, 80, 18, 6, true, false);
 
-  // Buttons
   const buttonW = 160;
   const buttonH = 40;
   const openX = WIDTH / 2 - buttonW / 2;
@@ -665,24 +688,18 @@ function drawGambleScreen() {
   const skipX = WIDTH / 2 - buttonW / 2;
   const skipY = HEIGHT / 2 + 110;
 
-  // Open button (disabled if not enough score)
   ctx.fillStyle = score >= cost ? "#FFD700" : "#666";
   roundRect(ctx, openX, openY, buttonW, buttonH, 6, true, false);
   ctx.fillStyle = score >= cost ? "black" : "#ddd";
   ctx.font = "18px Arial";
   ctx.fillText("Open Chest", WIDTH / 2, openY + 26);
 
-  // Skip button
   ctx.fillStyle = "#ccc";
   roundRect(ctx, skipX, skipY, buttonW, buttonH, 6, true, false);
   ctx.fillStyle = "black";
   ctx.font = "16px Arial";
   ctx.fillText("Skip (No Gamble)", WIDTH / 2, skipY + 26);
 
-  // Clean chances bar
-  drawChancesBar(px + 20, py + panelH - 74, panelW - 40);
-
-  // If reveal in progress, show the selected item name and description in a popup
   if (gambleRevealTimer > 0 && gambleSelected) {
     const info = POWER_UP_TYPES[gambleSelected];
     ctx.fillStyle = "rgba(0,0,0,0.6)";
@@ -694,28 +711,22 @@ function drawGambleScreen() {
   }
 }
 
-// linear interpolation helper
 function lerp(a, b, t) {
   return a + (b - a) * t;
 }
 
 function startGamble(cost) {
-  // Deduct cost up-front
   score -= cost;
   gambleInProgress = true;
   gambleSelected = null;
   gambleAnimationStep = 0;
   gambleRevealTimer = 0;
 
-  // Start a short timed spin and then pick
-  const spinDurationMs = 900; // how long the spin runs before picking
+  const spinDurationMs = 900;
   setTimeout(() => {
-    gambleSelected = pickWeightedLoot();
-    // let animation step continue so selected item interpolates to center
-    // show reveal for 1.8s
-    gambleRevealTimer = 108; // 1.8s at 60fps
+    gambleSelected = pickLoot();
+    gambleRevealTimer = 108;
 
-    // After reveal, apply powerup and advance level
     setTimeout(() => {
       if (gambleSelected) {
         activatePowerUp(gambleSelected);
@@ -749,6 +760,7 @@ function draw() {
   }
 
   drawBricks();
+  drawBonusBalls();
   drawPowerUps();
 
   if (glueMode) {
@@ -772,7 +784,6 @@ function draw() {
     drawCountdown();
   }
 
-  // draw gamble UI on top if active
   if (isGambleScreen) {
     drawGambleScreen();
   }
@@ -814,5 +825,3 @@ function start() {
 }
 
 window.addEventListener("load", start);
-
-// note: collisions.js is loaded after game.js, so these global function calls are resolved at runtime
