@@ -99,10 +99,20 @@ function resetBall() {
 
   const speedMultiplier = 1 + (level - 1) * 0.15;
   ball.transform.vx = 0;
-  ball.transform.vy = BALL_SPEED_START * speedMultiplier;
+  ball.transform.vy = 0;
   ball.isGlue = false;
 
   bonusBalls = [];
+}
+
+function launchBall() {
+  if (ball.transform.vx !== 0 || ball.transform.vy !== 0) {
+    return;
+  }
+
+  const speedMultiplier = 1 + (level - 1) * 0.15;
+  ball.transform.vx = 0;
+  ball.transform.vy = BALL_SPEED_START * speedMultiplier;
 }
 
 function nextLevel() {
@@ -256,6 +266,10 @@ function documentKeyHandler(event) {
   keys[event.key.toLowerCase()] = true;
   if (event.key.startsWith("Arrow")) {
     event.preventDefault();
+  }
+  if (event.code === "Space") {
+    event.preventDefault();
+    launchBall();
   }
 
   if (isGameOver && event.key.toLowerCase() === "r") {
