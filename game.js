@@ -92,6 +92,7 @@ let shieldHits = 0;
 let timeSlowTimeoutId = null;
 let paddleRestoreTimeoutId = null;
 let speedBoostTimeoutId = null;
+let activeSpeedBoostMultiplier = 1;
 
 function resetBall() {
   ball.transform.x = WIDTH / 2 - ball.transform.width / 2;
@@ -101,6 +102,12 @@ function resetBall() {
   ball.transform.vx = 0;
   ball.transform.vy = 0;
   ball.isGlue = false;
+
+  if (speedBoostTimeoutId) {
+    clearTimeout(speedBoostTimeoutId);
+    speedBoostTimeoutId = null;
+  }
+  activeSpeedBoostMultiplier = 1;
 
   bonusBalls = [];
 }
@@ -503,21 +510,28 @@ function applySpeedBoost(multiplier, durationMs) {
     clearTimeout(speedBoostTimeoutId);
   }
 
-  const boost = multiplier;
-  ball.transform.vx *= boost;
-  ball.transform.vy *= boost;
-  for (const b of bonusBalls) {
-    b.transform.vx *= boost;
-    b.transform.vy *= boost;
+  const previousBoost = activeSpeedBoostMultiplier;
+  const nextBoost = Math.max(previousBoost, multiplier);
+  const scale = previousBoost === 1 ? nextBoost : nextBoost / previousBoost;
+
+  if (scale !== 1) {
+    ball.transform.vx *= scale;
+    ball.transform.vy *= scale;
+    for (const b of bonusBalls) {
+      b.transform.vx *= scale;
+      b.transform.vy *= scale;
+    }
   }
 
+  activeSpeedBoostMultiplier = nextBoost;
   speedBoostTimeoutId = setTimeout(() => {
-    ball.transform.vx /= boost;
-    ball.transform.vy /= boost;
+    ball.transform.vx /= activeSpeedBoostMultiplier;
+    ball.transform.vy /= activeSpeedBoostMultiplier;
     for (const b of bonusBalls) {
-      b.transform.vx /= boost;
-      b.transform.vy /= boost;
+      b.transform.vx /= activeSpeedBoostMultiplier;
+      b.transform.vy /= activeSpeedBoostMultiplier;
     }
+    activeSpeedBoostMultiplier = 1;
     speedBoostTimeoutId = null;
   }, durationMs);
 }
