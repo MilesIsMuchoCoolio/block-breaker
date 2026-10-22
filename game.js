@@ -33,7 +33,7 @@ let bonusBalls = [];
 
 // --- Gambling / Loot Chest state & config ---
 let isGambleScreen = false;         // true while the post-level gamble UI is visible
-let gambleInProgress = false;      // true while chest-opening animation is running
+let gambleInProgress = false;      // true while the chest-opening animation is running
 let gambleSelected = null;         // picks the power-up type after reveal
 let gambleAnimationStep = 0;       // animation counter
 let gambleRevealTimer = 0;         // shows revealed item for a short time
@@ -359,19 +359,28 @@ function update() {
   }
 }
 
-function movePaddle() {
-  if (keys["arrowleft"] || keys["a"]) {
-    paddle.transform.x -= paddle.speed;
-  }
-  if (keys["arrowright"] || keys["d"]) {
-    paddle.transform.x += paddle.speed;
-  }
+function movePaddleLeft() {
+  paddle.transform.x -= paddle.speed;
 
   if (paddle.transform.x < 0) {
     paddle.transform.x = 0;
   }
+}
+
+function movePaddleRight() {
+  paddle.transform.x += paddle.speed;
+
   if (paddle.transform.x + paddle.transform.width > WIDTH) {
     paddle.transform.x = WIDTH - paddle.transform.width;
+  }
+}
+
+function movePaddle() {
+  if (keys["arrowleft"] || keys["a"]) {
+    movePaddleLeft();
+  }
+  if (keys["arrowright"] || keys["d"]) {
+    movePaddleRight();
   }
 }
 
