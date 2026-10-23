@@ -16,6 +16,7 @@ wallnutImage.src =
 let score = 0;
 let level = 1;
 let isGameOver = false;
+let isPaused = false;
 
 let countdown = 180;
 let isCountingDown = true;
@@ -37,6 +38,26 @@ let gambleInProgress = false;      // true while the chest-opening animation is 
 let gambleSelected = null;         // picks the power-up type after reveal
 let gambleAnimationStep = 0;       // animation counter
 let gambleRevealTimer = 0;         // shows revealed item for a short time
+
+function pause() {
+  if (isGameOver || isPaused) {
+    return;
+  }
+
+  isPaused = true;
+  lastTime = performance.now();
+  leftover = 0;
+}
+
+function unpause() {
+  if (!isPaused) {
+    return;
+  }
+
+  isPaused = false;
+  lastTime = performance.now();
+  leftover = 0;
+}
 
 // Cost fixed to 150
 function getGambleCost() {
@@ -279,6 +300,14 @@ function documentKeyHandler(event) {
     launchBall();
   }
 
+  if (event.key.toLowerCase() === "p") {
+    pause();
+  }
+
+  if (event.key.toLowerCase() === "o") {
+    unpause();
+  }
+
   if (isGameOver && event.key.toLowerCase() === "r") {
     resetGame();
   }
@@ -322,7 +351,7 @@ document.addEventListener("keyup", function (event) {
 });
 
 function update() {
-  if (isGameOver) {
+  if (isGameOver || isPaused) {
     return;
   }
 
@@ -636,6 +665,19 @@ function drawGameOverScreen() {
   ctx.fillText("Press R to Restart", WIDTH / 2, HEIGHT / 2 + 80);
 }
 
+function drawPauseScreen() {
+  ctx.fillStyle = "rgba(0, 0, 0, 0.55)";
+  ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+  ctx.fillStyle = "white";
+  ctx.font = "bold 42px Arial";
+  ctx.textAlign = "center";
+  ctx.fillText("PAUSED", WIDTH / 2, HEIGHT / 2 - 20);
+
+  ctx.font = "20px Arial";
+  ctx.fillText("Press O to Resume", WIDTH / 2, HEIGHT / 2 + 30);
+}
+
 function drawPowerUps() {
   for (const powerUp of powerUps) {
     ctx.fillStyle = powerUp.color || "#999";
@@ -825,6 +867,10 @@ function draw() {
     drawGambleScreen();
   }
 
+  if (isPaused) {
+    drawPauseScreen();
+  }
+
   if (isGameOver) {
     drawGameOverScreen();
   }
@@ -857,6 +903,7 @@ function start() {
   isCountingDown = true;
   countdown = 180;
   isGameOver = false;
+  isPaused = false;
   lastTime = performance.now();
   requestAnimationFrame(frame);
 }
