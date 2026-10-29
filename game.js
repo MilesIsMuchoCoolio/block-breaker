@@ -115,21 +115,29 @@ let paddleRestoreTimeoutId = null;
 let speedBoostTimeoutId = null;
 let activeSpeedBoostMultiplier = 1;
 
-function resetBall() {
-  ball.transform.x = WIDTH / 2 - ball.transform.width / 2;
-  ball.transform.y = HEIGHT / 2 - ball.transform.height / 2;
-
-  const speedMultiplier = 1 + (level - 1) * 0.15;
-  ball.transform.vx = 0;
-  ball.transform.vy = 0;
-  ball.isGlue = false;
-
+function clearTemporaryBallEffects() {
   if (speedBoostTimeoutId) {
     clearTimeout(speedBoostTimeoutId);
     speedBoostTimeoutId = null;
   }
-  activeSpeedBoostMultiplier = 1;
 
+  if (timeSlowTimeoutId) {
+    clearTimeout(timeSlowTimeoutId);
+    timeSlowTimeoutId = null;
+  }
+
+  activeSpeedBoostMultiplier = 1;
+}
+
+function resetBall() {
+  ball.transform.x = WIDTH / 2 - ball.transform.width / 2;
+  ball.transform.y = HEIGHT / 2 - ball.transform.height / 2;
+
+  ball.transform.vx = 0;
+  ball.transform.vy = 0;
+  ball.isGlue = false;
+
+  clearTemporaryBallEffects();
   bonusBalls = [];
 }
 
@@ -139,8 +147,17 @@ function launchBall() {
   }
 
   const speedMultiplier = 1 + (level - 1) * 0.15;
-  ball.transform.vx = 0;
-  ball.transform.vy = BALL_SPEED_START * speedMultiplier;
+  const baseSpeed = BALL_SPEED_START * speedMultiplier;
+  const launchDirection = Math.random() < 0.5 ? -1 : 1;
+  const horizontalSpeed = baseSpeed * 0.85 * launchDirection;
+
+  ball.transform.vx = horizontalSpeed;
+  ball.transform.vy = baseSpeed;
+
+  if (!Number.isFinite(ball.transform.vx) || !Number.isFinite(ball.transform.vy)) {
+    ball.transform.vx = baseSpeed * 0.85;
+    ball.transform.vy = baseSpeed;
+  }
 }
 
 function nextLevel() {
