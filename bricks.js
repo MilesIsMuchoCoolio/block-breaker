@@ -8,19 +8,16 @@ const BRICK_HEIGHT = 20;
 const BRICK_GAP = 6;
 const BRICKS_TOP = 50;
 
-// Helmet chances (per brick)
-const HELMET_BUCKET_CHANCE = 0.08; // ~8% of bricks have a bucket
-const HELMET_CONE_CHANCE = 0.12;   // ~12% of bricks have a cone
-
-// Stronger zombie variants
+// Special zombie variants
 const CONEHEAD_CHANCE = 0.10;
 const BUCKETHEAD_CHANCE = 0.06;
 
+// More rows at higher levels = harder gameplay
 function getBrickRows() {
   if (level <= 2) return 4;
   if (level <= 5) return 5;
   if (level <= 8) return 6;
-  return 7;
+  return 7; // Max 7 rows
 }
 
 const zombieColors = [
@@ -44,7 +41,6 @@ function makeBrick(x, y, type = 'default') {
 
   switch (normalizedType) {
     case 'conehead':
-      brick.type = 'conehead';
       brick.color = '#F39C12';
       brick.hits = 2;
       brick.maxHits = 2;
@@ -52,7 +48,6 @@ function makeBrick(x, y, type = 'default') {
       return brick;
 
     case 'buckethead':
-      brick.type = 'buckethead';
       brick.color = '#8B5A2B';
       brick.hits = 3;
       brick.maxHits = 3;
@@ -60,10 +55,10 @@ function makeBrick(x, y, type = 'default') {
       return brick;
 
     default:
-      brick.type = 'default';
       brick.color = zombieColors[0];
       brick.hits = 1;
       brick.maxHits = 1;
+      brick.helmet = null;
       return brick;
   }
 }
@@ -94,13 +89,6 @@ function makeBricks() {
       brick.colorIndex = (row + col) % zombieColors.length;
       if (brickType === 'default') {
         brick.color = zombieColors[brick.colorIndex];
-
-        const r = Math.random();
-        if (r < HELMET_BUCKET_CHANCE) {
-          brick.helmet = { type: 'bucket', stage: 0 };
-        } else if (r < HELMET_BUCKET_CHANCE + HELMET_CONE_CHANCE) {
-          brick.helmet = { type: 'cone', stage: 0 };
-        }
       }
 
       list.push(brick);
