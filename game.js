@@ -368,6 +368,7 @@ function update() {
     if (countdown <= 0) {
       isCountingDown = false;
       resetBall();
+      launchBall();
     }
     return;
   }
