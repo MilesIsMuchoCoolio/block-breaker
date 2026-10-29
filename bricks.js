@@ -28,27 +28,32 @@ const zombieColors = [
 ];
 
 function makeBrick(x, y, type = 'default') {
-  if (type === 'my_brick_name') {
-    return {
-      transform: createTransform(x, y, BRICK_WIDTH, BRICK_HEIGHT),
-      type,
-      color: '#FFB703',
-      hits: 3,
-      maxHits: 3,
-      colorIndex: 0,
-      helmet: null
-    };
-  }
-
-  return {
+  const normalizedType = String(type || 'default').toLowerCase().replace(/[\s_-]+/g, '');
+  const brick = {
     transform: createTransform(x, y, BRICK_WIDTH, BRICK_HEIGHT),
-    type,
+    type: normalizedType,
     colorIndex: 0,
     color: zombieColors[0],
     hits: 1,
     maxHits: 1,
     helmet: null
   };
+
+  if (normalizedType === 'conehead') {
+    brick.color = '#F39C12';
+    brick.hits = 2;
+    brick.maxHits = 2;
+    return brick;
+  }
+
+  if (normalizedType === 'buckethead') {
+    brick.color = '#8B5A2B';
+    brick.hits = 3;
+    brick.maxHits = 3;
+    return brick;
+  }
+
+  return brick;
 }
 
 function makeBricks() {
@@ -93,14 +98,13 @@ function drawBricks() {
     ctx.fillStyle = brickColor;
     ctx.fillRect(brickTransform.x, brickTransform.y, brickTransform.width, brickTransform.height);
 
-    // Optional indicator for multi-hit bricks
-    if (brick.hits && brick.hits > 1) {
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
+    if (brick.maxHits && brick.hits < brick.maxHits) {
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.18)';
       ctx.fillRect(
-        brickTransform.x + brickTransform.width - 10,
+        brickTransform.x + brickTransform.width - 8,
         brickTransform.y + 4,
-        6,
-        6
+        5,
+        5
       );
     }
 
