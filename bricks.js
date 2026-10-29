@@ -12,12 +12,15 @@ const BRICKS_TOP = 50;
 const HELMET_BUCKET_CHANCE = 0.08; // ~8% of bricks have a bucket
 const HELMET_CONE_CHANCE = 0.12;   // ~12% of bricks have a cone
 
-// More rows at higher levels = harder gameplay
+// Stronger zombie variants
+const CONEHEAD_CHANCE = 0.10;
+const BUCKETHEAD_CHANCE = 0.06;
+
 function getBrickRows() {
   if (level <= 2) return 4;
   if (level <= 5) return 5;
   if (level <= 8) return 6;
-  return 7; // Max 7 rows
+  return 7;
 }
 
 const zombieColors = [
@@ -39,21 +42,30 @@ function makeBrick(x, y, type = 'default') {
     helmet: null
   };
 
-  if (normalizedType === 'conehead') {
-    brick.color = '#F39C12';
-    brick.hits = 2;
-    brick.maxHits = 2;
-    return brick;
-  }
+  switch (normalizedType) {
+    case 'conehead':
+      brick.type = 'conehead';
+      brick.color = '#F39C12';
+      brick.hits = 2;
+      brick.maxHits = 2;
+      brick.helmet = { type: 'cone', stage: 0 };
+      return brick;
 
-  if (normalizedType === 'buckethead') {
-    brick.color = '#8B5A2B';
-    brick.hits = 3;
-    brick.maxHits = 3;
-    return brick;
-  }
+    case 'buckethead':
+      brick.type = 'buckethead';
+      brick.color = '#8B5A2B';
+      brick.hits = 3;
+      brick.maxHits = 3;
+      brick.helmet = { type: 'bucket', stage: 0 };
+      return brick;
 
-  return brick;
+    default:
+      brick.type = 'default';
+      brick.color = zombieColors[0];
+      brick.hits = 1;
+      brick.maxHits = 1;
+      return brick;
+  }
 }
 
 function makeBricks() {
@@ -64,24 +76,32 @@ function makeBricks() {
 
   for (let row = 0; row < brickRows; row++) {
     for (let col = 0; col < BRICK_COLUMNS; col++) {
-      // Decide whether this brick gets a helmet (bucket or cone)
-      let helmet = null;
-      const r = Math.random();
-      if (r < HELMET_BUCKET_CHANCE) {
-        helmet = { type: 'bucket', stage: 0 }; // stage: 0 = intact, 1 = damaged, 2 = removed
-      } else if (r < HELMET_BUCKET_CHANCE + HELMET_CONE_CHANCE) {
-        helmet = { type: 'cone', stage: 0 }; // stage: 0 = present, 1 = removed
+      let brickType = 'default';
+      const specialRoll = Math.random();
+
+      if (specialRoll < CONEHEAD_CHANCE) {
+        brickType = 'conehead';
+      } else if (specialRoll < CONEHEAD_CHANCE + BUCKETHEAD_CHANCE) {
+        brickType = 'buckethead';
       }
 
       const brick = makeBrick(
         left + col * (BRICK_WIDTH + BRICK_GAP),
         BRICKS_TOP + row * (BRICK_HEIGHT + BRICK_GAP),
-        'default'
+        brickType
       );
 
       brick.colorIndex = (row + col) % zombieColors.length;
-      brick.color = zombieColors[brick.colorIndex];
-      brick.helmet = helmet;
+      if (brickType === 'default') {
+        brick.color = zombieColors[brick.colorIndex];
+
+        const r = Math.random();
+        if (r < HELMET_BUCKET_CHANCE) {
+          brick.helmet = { type: 'bucket', stage: 0 };
+        } else if (r < HELMET_BUCKET_CHANCE + HELMET_CONE_CHANCE) {
+          brick.helmet = { type: 'cone', stage: 0 };
+        }
+      }
 
       list.push(brick);
     }
@@ -108,7 +128,6 @@ function drawBricks() {
       );
     }
 
-    // Eyes
     ctx.fillStyle = "white";
     const eyeY = brickTransform.y + brickTransform.height / 3;
     ctx.beginPath();
@@ -126,7 +145,6 @@ function drawBricks() {
     ctx.arc(brickTransform.x + brickTransform.width * 0.7, eyeY, 1.5, 0, Math.PI * 2);
     ctx.fill();
 
-    // Mouth / line
     ctx.strokeStyle = "#000";
     ctx.lineWidth = 1;
     ctx.beginPath();
@@ -134,13 +152,11 @@ function drawBricks() {
     ctx.lineTo(brickTransform.x + brickTransform.width * 0.8, brickTransform.y + brickTransform.height * 0.7);
     ctx.stroke();
 
-    // Draw helmet (bucket or cone) if present and not removed
     if (brick.helmet) {
       const h = brick.helmet;
       const cx = brickTransform.x + brickTransform.width / 2;
 
       if (h.type === 'cone' && h.stage === 0) {
-        // Cone: orange traffic cone shape
         ctx.fillStyle = '#FFA500';
         ctx.strokeStyle = '#CC8400';
         ctx.lineWidth = 1;
@@ -152,31 +168,26 @@ function drawBricks() {
         ctx.fill();
         ctx.stroke();
 
-        // Cone stripe
         ctx.fillStyle = '#FFF';
         ctx.fillRect(cx - 6, brickTransform.y - 2, 12, 4);
       }
 
       if (h.type === 'bucket' && h.stage < 2) {
-        // Bucket: a little metal bucket with a rim; stage 0 = intact, stage 1 = dented
         const bw = 28;
         const bh = 12;
         const bx = cx - bw / 2;
         const by = brickTransform.y - bh;
 
-        // bucket body
-        ctx.fillStyle = '#8B5A2B'; // brownish
+        ctx.fillStyle = '#8B5A2B';
         ctx.strokeStyle = '#5A3E26';
         ctx.lineWidth = 1;
         roundRect(ctx, bx, by, bw, bh, 3, true, true);
 
-        // rim
         ctx.fillStyle = '#A67C52';
         ctx.fillRect(bx - 2, by - 4, bw + 4, 4);
         ctx.strokeRect(bx - 2, by - 4, bw + 4, 4);
 
         if (h.stage === 1) {
-          // damaged: draw a dent / crack
           ctx.strokeStyle = '#3b2214';
           ctx.beginPath();
           ctx.moveTo(bx + 6, by + 4);
@@ -189,7 +200,6 @@ function drawBricks() {
   }
 }
 
-// tiny helper to draw rounded rects
 function roundRect(ctx, x, y, width, height, radius, fill, stroke) {
   if (typeof stroke === 'undefined') {
     stroke = true;
