@@ -27,6 +27,30 @@ const zombieColors = [
   "#6A9C79"
 ];
 
+function makeBrick(x, y, type = 'default') {
+  if (type === 'my_brick_name') {
+    return {
+      transform: createTransform(x, y, BRICK_WIDTH, BRICK_HEIGHT),
+      type,
+      color: '#FFB703',
+      hits: 3,
+      maxHits: 3,
+      colorIndex: 0,
+      helmet: null
+    };
+  }
+
+  return {
+    transform: createTransform(x, y, BRICK_WIDTH, BRICK_HEIGHT),
+    type,
+    colorIndex: 0,
+    color: zombieColors[0],
+    hits: 1,
+    maxHits: 1,
+    helmet: null
+  };
+}
+
 function makeBricks() {
   const list = [];
   const brickRows = getBrickRows();
@@ -44,16 +68,17 @@ function makeBricks() {
         helmet = { type: 'cone', stage: 0 }; // stage: 0 = present, 1 = removed
       }
 
-      list.push({
-        transform: createTransform(
-          left + col * (BRICK_WIDTH + BRICK_GAP),
-          BRICKS_TOP + row * (BRICK_HEIGHT + BRICK_GAP),
-          BRICK_WIDTH,
-          BRICK_HEIGHT
-        ),
-        colorIndex: (row + col) % zombieColors.length,
-        helmet // null or {type, stage}
-      });
+      const brick = makeBrick(
+        left + col * (BRICK_WIDTH + BRICK_GAP),
+        BRICKS_TOP + row * (BRICK_HEIGHT + BRICK_GAP),
+        'default'
+      );
+
+      brick.colorIndex = (row + col) % zombieColors.length;
+      brick.color = zombieColors[brick.colorIndex];
+      brick.helmet = helmet;
+
+      list.push(brick);
     }
   }
 
@@ -63,9 +88,21 @@ function makeBricks() {
 function drawBricks() {
   for (const brick of bricks) {
     const brickTransform = brick.transform || brick;
+    const brickColor = brick.color || zombieColors[brick.colorIndex];
 
-    ctx.fillStyle = zombieColors[brick.colorIndex];
+    ctx.fillStyle = brickColor;
     ctx.fillRect(brickTransform.x, brickTransform.y, brickTransform.width, brickTransform.height);
+
+    // Optional indicator for multi-hit bricks
+    if (brick.hits && brick.hits > 1) {
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
+      ctx.fillRect(
+        brickTransform.x + brickTransform.width - 10,
+        brickTransform.y + 4,
+        6,
+        6
+      );
+    }
 
     // Eyes
     ctx.fillStyle = "white";
