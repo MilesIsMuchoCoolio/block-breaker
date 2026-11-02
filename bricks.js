@@ -12,9 +12,9 @@ const BRICKS_TOP = 50;
 const CONEHEAD_CHANCE = 0.10;
 const BUCKETHEAD_CHANCE = 0.06;
 
-// Add one row every two levels, up to 10 rows.
+// Start at 10 rows and grow as levels increase.
 function getBrickRows() {
-  return Math.min(10, 2 + Math.floor((level - 1) / 2));
+  return Math.min(14, 10 + Math.floor((level - 1) / 2));
 }
 
 const zombieColors = [
@@ -108,7 +108,6 @@ function makeBricks() {
         brickType
       );
 
-      // Pattern accents keep the original zombie colors/skins intact.
       brick.colorIndex = (row + col + pattern) % zombieColors.length;
       if (brickType === 'default') {
         brick.color = zombieColors[brick.colorIndex];
