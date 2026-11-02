@@ -14,10 +14,10 @@ const BUCKETHEAD_CHANCE = 0.06;
 
 // More rows at higher levels = harder gameplay
 function getBrickRows() {
-  if (level <= 2) return 4;
-  if (level <= 5) return 5;
-  if (level <= 8) return 6;
-  return 7; // Max 7 rows
+  if (level <= 2) return 2;
+  if (level <= 5) return 3;
+  if (level <= 8) return 4;
+  return 5; // Max 5 rows
 }
 
 const zombieColors = [
