@@ -72,7 +72,6 @@ const POWER_UP_TYPES = {
   LASER: { symbol: "L", color: "#FF4500", effect: "Laser: paddle fires a burst that damages bricks" },
   SHIELD: { symbol: "D", color: "#1E90FF", effect: "Shield: prevents 1 lost ball" },
   TIME: { symbol: "T", color: "#00BFFF", effect: "Time Slow: slow ball for a short while" },
-  SPLIT: { symbol: "P", color: "#FFD700", effect: "Split: current ball splits into multiple balls" },
   MEGA: { symbol: "X", color: "#FF0000", effect: "MEGA: huge temporary buff (very rare)" }
 };
 
@@ -86,7 +85,6 @@ const LOOT_TABLE = [
   { type: "LASER", chance: 8 },
   { type: "SHIELD", chance: 4 },
   { type: "TIME", chance: 3 },
-  { type: "SPLIT", chance: 2 },
   { type: "MEGA", chance: 1 }
 ];
 
@@ -714,9 +712,6 @@ function activatePowerUp(type) {
         score += 20 * level;
       }
     }
-  } else if (type === "SPLIT") {
-    addBallBurst(3, 0.4);
-    score += 120;
   } else if (type === "MEGA") {
     score += 800;
     shieldHits = Math.max(shieldHits, 2);
