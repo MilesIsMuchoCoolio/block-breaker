@@ -25,6 +25,7 @@ const ball = {
 let bonusBalls = [];
 
 let shieldHits = 0;
+const MAX_SHIELD_HITS = 10;
 let timeSlowTimeoutId = null;
 let paddleRestoreTimeoutId = null;
 let speedBoostTimeoutId = null;
@@ -54,7 +55,7 @@ const POWER_UP_TYPES = {
   SCATTER: { symbol: "S", color: "#F97316", effect: "Scatter: launches a fan of balls" },
   HEAT: { symbol: "H", color: "#FF4500", effect: "Heat-seeking: ball homes in on nearby bricks" },
   LASER: { symbol: "L", color: "#FF4500", effect: "Laser: paddle fires a burst that damages bricks" },
-  SHIELD: { symbol: "D", color: "#1E90FF", effect: "Shield: prevents 1 lost ball" },
+  SHIELD: { symbol: "D", color: "#1E90FF", effect: "Shield: prevents 1 lost ball; shields stack" },
   TIME: { symbol: "T", color: "#00BFFF", effect: "Time Slow: slow ball for a short while" },
   MEGA: { symbol: "X", color: "#FF0000", effect: "MEGA: huge temporary buff (very rare)" }
 };
@@ -163,6 +164,7 @@ function resetGame() {
   bricks = makeBricks();
   powerUps = [];
   bonusBalls = [];
+  shieldHits = 0;
   glueMessage = "";
   glueMessageTimer = 0;
   resetBall();
@@ -275,7 +277,7 @@ function update() {
       shieldHits--;
       ball.transform.y = paddle.transform.y - ball.transform.height;
       ball.transform.vy = -Math.abs(ball.transform.vy);
-      glueMessage = "Shield absorbed a miss!";
+      glueMessage = `Shield absorbed a miss! ${shieldHits} shield${shieldHits === 1 ? "" : "s"} left`;
       glueMessageTimer = 90;
     } else {
       isGameOver = true;
@@ -425,7 +427,8 @@ function activatePowerUp(type) {
       timeSlowTimeoutId = null;
     }, 5000);
   } else if (type === "SHIELD") {
-    shieldHits = Math.max(shieldHits, 1);
+    shieldHits = Math.min(MAX_SHIELD_HITS, shieldHits + 1);
+    glueMessage = `Shield gained! ${shieldHits} shield${shieldHits === 1 ? "" : "s"} ready`;
   } else if (type === "MULTI") {
     addBallBurst(2, 0.25);
     score += 150;
@@ -456,7 +459,7 @@ function activatePowerUp(type) {
     }
   } else if (type === "MEGA") {
     score += 800;
-    shieldHits = Math.max(shieldHits, 2);
+    shieldHits = Math.min(MAX_SHIELD_HITS, shieldHits + 2);
     paddle.transform.width = Math.min(paddle.transform.width + 80, WIDTH);
     applySpeedBoost(1.25, 8000);
     if (paddleRestoreTimeoutId) clearTimeout(paddleRestoreTimeoutId);
@@ -473,6 +476,10 @@ function drawHUD() {
   ctx.textAlign = "left";
   ctx.fillText("Level: " + level, 16, 24);
   ctx.fillText("Score: " + score, 16, 48);
+  if (shieldHits > 0) {
+    ctx.fillStyle = "#1E90FF";
+    ctx.fillText("Shields: " + shieldHits, 16, 72);
+  }
 }
 
 function drawCountdown() {
