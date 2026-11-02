@@ -12,12 +12,9 @@ const BRICKS_TOP = 50;
 const CONEHEAD_CHANCE = 0.10;
 const BUCKETHEAD_CHANCE = 0.06;
 
-// More rows at higher levels = harder gameplay
+// Add one row every two levels, up to 10 rows.
 function getBrickRows() {
-  if (level <= 2) return 2;
-  if (level <= 5) return 3;
-  if (level <= 8) return 4;
-  return 5; // Max 5 rows
+  return Math.min(10, 2 + Math.floor((level - 1) / 2));
 }
 
 const zombieColors = [
@@ -26,6 +23,27 @@ const zombieColors = [
   "#3A6C49",
   "#6A9C79"
 ];
+
+function getBrickPattern(row, col, rows, pattern) {
+  const centerCol = (BRICK_COLUMNS - 1) / 2;
+  const centerRow = (rows - 1) / 2;
+  const distanceFromCenter = Math.abs(col - centerCol) + Math.abs(row - centerRow);
+
+  switch (pattern) {
+    case 0: // Chevron
+      return row >= Math.abs(col - centerCol) * 0.55;
+    case 1: // Diamond
+      return distanceFromCenter <= Math.min(centerCol, centerRow + 1);
+    case 2: // Checkerboard
+      return (row + col) % 2 === 0 || level < 5;
+    case 3: // Twin wings
+      return col < 2 || col > BRICK_COLUMNS - 3 || row % 2 === 0;
+    case 4: // Zig-zag waves
+      return (row + Math.floor(col / 2)) % 2 === 0 || row === 0;
+    default: // Full rows, used for early levels
+      return true;
+  }
+}
 
 function makeBrick(x, y, type = 'default') {
   const normalizedType = String(type || 'default').toLowerCase().replace(/[\s_-]+/g, '');
@@ -68,15 +86,19 @@ function makeBricks() {
   const brickRows = getBrickRows();
   const totalWidth = BRICK_COLUMNS * BRICK_WIDTH + (BRICK_COLUMNS - 1) * BRICK_GAP;
   const left = (WIDTH - totalWidth) / 2;
+  const pattern = Math.floor((level - 1) / 2) % 5;
 
   for (let row = 0; row < brickRows; row++) {
     for (let col = 0; col < BRICK_COLUMNS; col++) {
+      if (!getBrickPattern(row, col, brickRows, pattern)) continue;
+
       let brickType = 'default';
       const specialRoll = Math.random();
+      const difficultyBonus = Math.min(0.12, (level - 1) * 0.01);
 
-      if (specialRoll < CONEHEAD_CHANCE) {
+      if (specialRoll < CONEHEAD_CHANCE + difficultyBonus) {
         brickType = 'conehead';
-      } else if (specialRoll < CONEHEAD_CHANCE + BUCKETHEAD_CHANCE) {
+      } else if (specialRoll < CONEHEAD_CHANCE + difficultyBonus + BUCKETHEAD_CHANCE) {
         brickType = 'buckethead';
       }
 
@@ -86,7 +108,8 @@ function makeBricks() {
         brickType
       );
 
-      brick.colorIndex = (row + col) % zombieColors.length;
+      // Pattern accents keep the original zombie colors/skins intact.
+      brick.colorIndex = (row + col + pattern) % zombieColors.length;
       if (brickType === 'default') {
         brick.color = zombieColors[brick.colorIndex];
       }
