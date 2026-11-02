@@ -32,12 +32,15 @@ const ball = {
 
 let bonusBalls = [];
 
-// --- Gambling / Loot Chest state & config ---
-let isGambleScreen = false;         // true while the post-level gamble UI is visible
-let gambleInProgress = false;      // true while the chest-opening animation is running
-let gambleSelected = null;         // picks the power-up type after reveal
-let gambleAnimationStep = 0;       // animation counter
-let gambleRevealTimer = 0;         // shows revealed item for a short time
+// Timers for some temporary effects
+let shieldHits = 0;
+let timeSlowTimeoutId = null;
+let paddleRestoreTimeoutId = null;
+let speedBoostTimeoutId = null;
+let activeSpeedBoostMultiplier = 1;
+let biggerBallTimeoutId = null;
+let heatSeekTimeoutId = null;
+let heatSeekingBall = false;
 
 function pause() {
   if (isGameOver || isPaused) {
@@ -59,24 +62,32 @@ function unpause() {
   leftover = 0;
 }
 
-// Cost fixed to 150
-function getGambleCost() {
-  return 150;
-}
-
-// Starting power-up is speed up; the others are locked until you intentionally unlock them.
 const POWER_UP_TYPES = {
   SPEED: { symbol: "↑", color: "#7CFC00", effect: "Speed Up: boosts the ball for a short time" },
   MULTI: { symbol: "M", color: "#FF69B4", effect: "Multi-ball: temporary extra balls" },
+  GLUE: { symbol: "G", color: "#8B5CF6", effect: "Glue: sticky ball mode on the paddle" },
+  BIGGER: { symbol: "B", color: "#F59E0B", effect: "Bigger Ball: temporary oversized ball" },
+  SCATTER: { symbol: "S", color: "#F97316", effect: "Scatter: launches a fan of balls" },
+  HEAT: { symbol: "H", color: "#FF4500", effect: "Heat-seeking: ball homes in on nearby bricks" },
   LASER: { symbol: "L", color: "#FF4500", effect: "Laser: paddle fires a burst that damages bricks" },
-  SHIELD: { symbol: "S", color: "#1E90FF", effect: "Shield: prevents 1 lost ball" },
-  TIME:  { symbol: "T", color: "#00BFFF", effect: "Time Slow: slow ball for a short while" },
+  SHIELD: { symbol: "D", color: "#1E90FF", effect: "Shield: prevents 1 lost ball" },
+  TIME: { symbol: "T", color: "#00BFFF", effect: "Time Slow: slow ball for a short while" },
   SPLIT: { symbol: "P", color: "#FFD700", effect: "Split: current ball splits into multiple balls" },
-  MEGA:  { symbol: "X", color: "#FF0000", effect: "MEGA: huge temporary buff (very rare)" }
+  MEGA: { symbol: "X", color: "#FF0000", effect: "MEGA: huge temporary buff (very rare)" }
 };
 
 const LOOT_TABLE = [
-  { type: "SPEED", chance: 100 }
+  { type: "SPEED", chance: 18 },
+  { type: "MULTI", chance: 16 },
+  { type: "GLUE", chance: 14 },
+  { type: "BIGGER", chance: 13 },
+  { type: "SCATTER", chance: 12 },
+  { type: "HEAT", chance: 10 },
+  { type: "LASER", chance: 8 },
+  { type: "SHIELD", chance: 4 },
+  { type: "TIME", chance: 3 },
+  { type: "SPLIT", chance: 2 },
+  { type: "MEGA", chance: 1 }
 ];
 
 function pickLoot() {
@@ -108,13 +119,6 @@ function maybeSpawnPowerUp(brickX, brickY, brickWidth, brickHeight) {
   });
 }
 
-// Timers for some temporary effects
-let shieldHits = 0;
-let timeSlowTimeoutId = null;
-let paddleRestoreTimeoutId = null;
-let speedBoostTimeoutId = null;
-let activeSpeedBoostMultiplier = 1;
-
 function clearTemporaryBallEffects() {
   if (speedBoostTimeoutId) {
     clearTimeout(speedBoostTimeoutId);
@@ -126,6 +130,17 @@ function clearTemporaryBallEffects() {
     timeSlowTimeoutId = null;
   }
 
+  if (biggerBallTimeoutId) {
+    clearTimeout(biggerBallTimeoutId);
+    biggerBallTimeoutId = null;
+  }
+
+  if (heatSeekTimeoutId) {
+    clearTimeout(heatSeekTimeoutId);
+    heatSeekTimeoutId = null;
+  }
+
+  heatSeekingBall = false;
   activeSpeedBoostMultiplier = 1;
 }
 
@@ -133,6 +148,8 @@ function resetBall() {
   ball.transform.x = WIDTH / 2 - ball.transform.width / 2;
   ball.transform.y = HEIGHT / 2 - ball.transform.height / 2;
 
+  ball.transform.width = BALL_SIZE;
+  ball.transform.height = BALL_SIZE;
   ball.transform.vx = 0;
   ball.transform.vy = 0;
   ball.isGlue = false;
@@ -142,6 +159,11 @@ function resetBall() {
 }
 
 function launchBall() {
+  if (ball.isGlue) {
+    ball.isGlue = false;
+    glueMode = false;
+  }
+
   if (ball.transform.vx !== 0 || ball.transform.vy !== 0) {
     return;
   }
@@ -314,6 +336,10 @@ function documentKeyHandler(event) {
   }
   if (event.code === "Space") {
     event.preventDefault();
+    if (ball.isGlue) {
+      launchBall();
+      return;
+    }
     launchBall();
   }
 
@@ -332,51 +358,94 @@ function documentKeyHandler(event) {
 
 document.addEventListener("keydown", documentKeyHandler);
 
-canvas.addEventListener("click", function (evt) {
-  if (!isGambleScreen) return;
-  if (gambleInProgress) return;
-
-  const rect = canvas.getBoundingClientRect();
-  const x = evt.clientX - rect.left;
-  const y = evt.clientY - rect.top;
-
-  const buttonW = 160;
-  const buttonH = 40;
-  const openX = WIDTH / 2 - buttonW / 2;
-  const openY = HEIGHT / 2 + 60;
-  const skipX = WIDTH / 2 - buttonW / 2;
-  const skipY = HEIGHT / 2 + 110;
-
-  if (x >= openX && x <= openX + buttonW && y >= openY && y <= openY + buttonH) {
-    const cost = getGambleCost();
-    if (score >= cost) {
-      startGamble(cost);
-    } else {
-      glueMessage = "Not enough score to open chest";
-      glueMessageTimer = 120;
-    }
-  }
-
-  if (x >= skipX && x <= skipX + buttonW && y >= skipY && y <= skipY + buttonH) {
-    isGambleScreen = false;
-    nextLevel();
-  }
-});
-
 document.addEventListener("keyup", function (event) {
   keys[event.key.toLowerCase()] = false;
 });
 
-function update() {
-  if (isGameOver || isPaused) {
+function updateHeatSeeking() {
+  if (!heatSeekingBall || !bricks.length) {
     return;
   }
 
-  if (isGambleScreen) {
-    if (gambleInProgress) {
-      gambleAnimationStep++;
+  let targetBrick = null;
+  let bestDistance = Infinity;
+
+  for (const brick of bricks) {
+    const b = brick.transform || brick;
+    const dx = (b.x + b.width / 2) - (ball.transform.x + ball.transform.width / 2);
+    const dy = (b.y + b.height / 2) - (ball.transform.y + ball.transform.height / 2);
+    const distance = dx * dx + dy * dy;
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      targetBrick = brick;
     }
-    if (gambleRevealTimer > 0) gambleRevealTimer--;
+  }
+
+  if (!targetBrick) {
+    return;
+  }
+
+  const target = targetBrick.transform || targetBrick;
+  const targetX = target.x + target.width / 2;
+  const targetY = target.y + target.height / 2;
+  const ballX = ball.transform.x + ball.transform.width / 2;
+  const ballY = ball.transform.y + ball.transform.height / 2;
+  const dx = targetX - ballX;
+  const dy = targetY - ballY;
+  const currentAngle = Math.atan2(ball.transform.vy, ball.transform.vx);
+  const targetAngle = Math.atan2(dy, dx);
+  const angleDelta = normalizeAngle(targetAngle - currentAngle);
+  const turnRate = 0.16;
+  const nextAngle = currentAngle + Math.max(-turnRate, Math.min(turnRate, angleDelta));
+  const speed = Math.hypot(ball.transform.vx, ball.transform.vy) || BALL_SPEED_START;
+
+  ball.transform.vx = Math.cos(nextAngle) * speed;
+  ball.transform.vy = Math.sin(nextAngle) * speed;
+}
+
+function normalizeAngle(angle) {
+  while (angle > Math.PI) angle -= Math.PI * 2;
+  while (angle < -Math.PI) angle += Math.PI * 2;
+  return angle;
+}
+
+function applyBiggerBall() {
+  ball.transform.width = BALL_SIZE * 1.8;
+  ball.transform.height = BALL_SIZE * 1.8;
+
+  for (const b of bonusBalls) {
+    b.transform.width = BALL_SIZE * 1.8;
+    b.transform.height = BALL_SIZE * 1.8;
+  }
+
+  if (biggerBallTimeoutId) {
+    clearTimeout(biggerBallTimeoutId);
+  }
+
+  biggerBallTimeoutId = setTimeout(() => {
+    ball.transform.width = BALL_SIZE;
+    ball.transform.height = BALL_SIZE;
+
+    for (const b of bonusBalls) {
+      b.transform.width = BALL_SIZE;
+      b.transform.height = BALL_SIZE;
+    }
+
+    biggerBallTimeoutId = null;
+  }, 8000);
+}
+
+function activateGlueMode() {
+  glueMode = true;
+  ball.isGlue = true;
+  ball.transform.vx = 0;
+  ball.transform.vy = 0;
+  ball.transform.x = paddle.transform.x + paddle.transform.width / 2 - ball.transform.width / 2;
+  ball.transform.y = paddle.transform.y - ball.transform.height;
+}
+
+function update() {
+  if (isGameOver || isPaused) {
     return;
   }
 
@@ -390,9 +459,18 @@ function update() {
     return;
   }
 
+  if (ball.isGlue) {
+    ball.transform.x = paddle.transform.x + paddle.transform.width / 2 - ball.transform.width / 2;
+    ball.transform.y = paddle.transform.y - ball.transform.height;
+    updatePowerUps();
+    checkPowerUpCollision();
+    return;
+  }
+
   movePaddle();
   moveBall();
   updateBonusBalls();
+  updateHeatSeeking();
 
   bounceOffWalls();
   bounceOffPaddle();
@@ -418,11 +496,7 @@ function update() {
   }
 
   if (bricks.length === 0) {
-    isGambleScreen = true;
-    gambleInProgress = false;
-    gambleSelected = null;
-    gambleAnimationStep = 0;
-    gambleRevealTimer = 0;
+    nextLevel();
     return;
   }
 }
@@ -613,6 +687,22 @@ function activatePowerUp(type) {
   } else if (type === "MULTI") {
     addBallBurst(2, 0.25);
     score += 150;
+  } else if (type === "GLUE") {
+    activateGlueMode();
+  } else if (type === "BIGGER") {
+    applyBiggerBall();
+    score += 100;
+  } else if (type === "SCATTER") {
+    addBallBurst(5, 0.95);
+    score += 220;
+  } else if (type === "HEAT") {
+    heatSeekingBall = true;
+    if (heatSeekTimeoutId) clearTimeout(heatSeekTimeoutId);
+    heatSeekTimeoutId = setTimeout(() => {
+      heatSeekingBall = false;
+      heatSeekTimeoutId = null;
+    }, 8000);
+    score += 160;
   } else if (type === "LASER") {
     let destroyed = 0;
     for (let i = 0; i < bricks.length && destroyed < 3; i++) {
@@ -720,122 +810,6 @@ function drawBonusBalls() {
   }
 }
 
-function drawGambleScreen() {
-  ctx.fillStyle = "rgba(0,0,0,0.75)";
-  ctx.fillRect(0, 0, WIDTH, HEIGHT);
-
-  ctx.fillStyle = "#2b6f3a";
-  const panelW = 480;
-  const panelH = 280;
-  const px = WIDTH / 2 - panelW / 2;
-  const py = HEIGHT / 2 - panelH / 2;
-  roundRect(ctx, px, py, panelW, panelH, 10, true, false);
-
-  ctx.fillStyle = "white";
-  ctx.font = "20px Arial";
-  ctx.textAlign = "center";
-  ctx.fillText("Level Cleared! Open a Loot Chest?", WIDTH / 2, py + 36);
-
-  const cost = getGambleCost();
-  ctx.font = "16px Arial";
-  ctx.fillText(`Open chest for ${cost} score`, WIDTH / 2, py + 66);
-
-  const centerX = WIDTH / 2;
-  const centerY = py + 130;
-  const radius = 80;
-  const items = LOOT_TABLE.map(e => e.type);
-  const spinSpeed = 0.12;
-  const baseAngle = gambleAnimationStep * spinSpeed;
-
-  for (let i = 0; i < items.length; i++) {
-    const angle = baseAngle + (i / items.length) * Math.PI * 2;
-    let tx = centerX + Math.cos(angle) * radius;
-    let ty = centerY + Math.sin(angle) * radius;
-    const type = items[i];
-    const info = POWER_UP_TYPES[type];
-
-    if (gambleSelected && type === gambleSelected) {
-      const t = Math.min(1, gambleAnimationStep / 20);
-      tx = lerp(tx, centerX, t);
-      ty = lerp(ty, centerY, t);
-    }
-
-    ctx.beginPath();
-    ctx.fillStyle = info.color || "#fff";
-    ctx.arc(tx, ty, 20, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.fillStyle = "black";
-    ctx.font = "bold 14px Arial";
-    ctx.textAlign = "center";
-    ctx.fillText(info.symbol || "?", tx, ty + 5);
-  }
-
-  const chestX = centerX - 36;
-  const chestY = centerY + 50;
-  ctx.fillStyle = "#8B4513";
-  roundRect(ctx, chestX, chestY, 72, 44, 6, true, false);
-  ctx.fillStyle = "#A0522D";
-  roundRect(ctx, chestX - 4, chestY - 12, 80, 18, 6, true, false);
-
-  const buttonW = 160;
-  const buttonH = 40;
-  const openX = WIDTH / 2 - buttonW / 2;
-  const openY = HEIGHT / 2 + 60;
-  const skipX = WIDTH / 2 - buttonW / 2;
-  const skipY = HEIGHT / 2 + 110;
-
-  ctx.fillStyle = score >= cost ? "#FFD700" : "#666";
-  roundRect(ctx, openX, openY, buttonW, buttonH, 6, true, false);
-  ctx.fillStyle = score >= cost ? "black" : "#ddd";
-  ctx.font = "18px Arial";
-  ctx.fillText("Open Chest", WIDTH / 2, openY + 26);
-
-  ctx.fillStyle = "#ccc";
-  roundRect(ctx, skipX, skipY, buttonW, buttonH, 6, true, false);
-  ctx.fillStyle = "black";
-  ctx.font = "16px Arial";
-  ctx.fillText("Skip (No Gamble)", WIDTH / 2, skipY + 26);
-
-  if (gambleRevealTimer > 0 && gambleSelected) {
-    const info = POWER_UP_TYPES[gambleSelected];
-    ctx.fillStyle = "rgba(0,0,0,0.6)";
-    roundRect(ctx, centerX - 160, py + panelH - 120, 320, 60, 6, true, false);
-    ctx.fillStyle = "white";
-    ctx.font = "18px Arial";
-    ctx.textAlign = "center";
-    ctx.fillText(`${gambleSelected}: ${info.effect}`, centerX, py + panelH - 86);
-  }
-}
-
-function lerp(a, b, t) {
-  return a + (b - a) * t;
-}
-
-function startGamble(cost) {
-  score -= cost;
-  gambleInProgress = true;
-  gambleSelected = null;
-  gambleAnimationStep = 0;
-  gambleRevealTimer = 0;
-
-  const spinDurationMs = 900;
-  setTimeout(() => {
-    gambleSelected = pickLoot();
-    gambleRevealTimer = 108;
-
-    setTimeout(() => {
-      if (gambleSelected) {
-        activatePowerUp(gambleSelected);
-      }
-      gambleInProgress = false;
-      gambleSelected = null;
-      isGambleScreen = false;
-      nextLevel();
-    }, 1800);
-  }, spinDurationMs);
-}
-
 function draw() {
   ctx.fillStyle = "#1a472a";
   ctx.fillRect(0, 0, WIDTH, HEIGHT);
@@ -879,10 +853,6 @@ function draw() {
 
   if (isCountingDown) {
     drawCountdown();
-  }
-
-  if (isGambleScreen) {
-    drawGambleScreen();
   }
 
   if (isPaused) {
