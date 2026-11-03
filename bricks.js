@@ -19,10 +19,26 @@ function stayStill(brick) {
   return brick;
 }
 
+// Move the entire row together, reversing at the canvas edges.
 function slide(brick) {
-  brick.transform.x += brick.speed;
-  if (Math.abs(brick.transform.x - brick.startX) > 30) {
-    brick.speed *= -1;
+  const row = brick.motionGroup;
+  if (!row || row.bricks.length === 0) return;
+
+  const leftEdge = Math.min(...row.bricks.map(item => item.transform.x));
+  const rightEdge = Math.max(...row.bricks.map(item => item.transform.x + item.transform.width));
+  let distance = row.speed * row.direction;
+
+  if (leftEdge + distance < 0) {
+    distance = -leftEdge;
+    row.direction = 1;
+  } else if (rightEdge + distance > WIDTH) {
+    distance = WIDTH - rightEdge;
+    row.direction = -1;
+  }
+
+  for (const item of row.bricks) {
+    item.transform.x += distance;
+    item.speed = row.speed * row.direction;
   }
 }
 
@@ -100,6 +116,7 @@ function makeBrick(x, y, type = 'default') {
 
 function makeBricks() {
   const list = [];
+  const movingRow = [];
   const brickRows = getBrickRows();
   const totalWidth = BRICK_COLUMNS * BRICK_WIDTH + (BRICK_COLUMNS - 1) * BRICK_GAP;
   const left = (WIDTH - totalWidth) / 2;
@@ -126,8 +143,7 @@ function makeBricks() {
       );
 
       brick.startX = brick.transform.x;
-      brick.speed = row === MOVING_BRICK_ROW ? MOVING_BRICK_SPEED : 0;
-      brick.moveStrategy = row === MOVING_BRICK_ROW ? slide : stayStill;
+      if (row === MOVING_BRICK_ROW) movingRow.push(brick);
 
       brick.colorIndex = (row + col + pattern) % zombieColors.length;
       if (brickType === 'default') {
@@ -136,6 +152,18 @@ function makeBricks() {
 
       list.push(brick);
     }
+  }
+
+  if (movingRow.length > 0) {
+    const motionGroup = {
+      bricks: movingRow,
+      speed: MOVING_BRICK_SPEED,
+      direction: 1
+    };
+    // The first brick advances the shared row once per game update.
+    movingRow[0].motionGroup = motionGroup;
+    movingRow[0].moveStrategy = slide;
+    movingRow[0].speed = MOVING_BRICK_SPEED;
   }
 
   return list;
