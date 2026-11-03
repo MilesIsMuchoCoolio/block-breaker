@@ -262,6 +262,10 @@ function update() {
     return;
   }
 
+  for (const brick of bricks) {
+    brick.moveStrategy(brick);
+  }
+
   movePaddle();
   moveBall();
   updateBonusBalls();
@@ -603,3 +607,4 @@ function start() {
 }
 
 window.addEventListener("load", start);
+

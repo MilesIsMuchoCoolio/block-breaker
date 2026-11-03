@@ -8,9 +8,23 @@ const BRICK_HEIGHT = 20;
 const BRICK_GAP = 6;
 const BRICKS_TOP = 50;
 
+const MOVING_BRICK_ROW = 0;
+const MOVING_BRICK_SPEED = 1;
+
 // Special zombie variants
 const CONEHEAD_CHANCE = 0.10;
 const BUCKETHEAD_CHANCE = 0.06;
+
+function stayStill(brick) {
+  return brick;
+}
+
+function slide(brick) {
+  brick.transform.x += brick.speed;
+  if (Math.abs(brick.transform.x - brick.startX) > 30) {
+    brick.speed *= -1;
+  }
+}
 
 // Start at 10 rows and grow as levels increase.
 function getBrickRows() {
@@ -54,7 +68,10 @@ function makeBrick(x, y, type = 'default') {
     color: zombieColors[0],
     hits: 1,
     maxHits: 1,
-    helmet: null
+    helmet: null,
+    moveStrategy: stayStill,
+    speed: 0,
+    startX: x
   };
 
   switch (normalizedType) {
@@ -107,6 +124,10 @@ function makeBricks() {
         BRICKS_TOP + row * (BRICK_HEIGHT + BRICK_GAP),
         brickType
       );
+
+      brick.startX = brick.transform.x;
+      brick.speed = row === MOVING_BRICK_ROW ? MOVING_BRICK_SPEED : 0;
+      brick.moveStrategy = row === MOVING_BRICK_ROW ? slide : stayStill;
 
       brick.colorIndex = (row + col + pattern) % zombieColors.length;
       if (brickType === 'default') {
@@ -231,3 +252,4 @@ function roundRect(ctx, x, y, width, height, radius, fill, stroke) {
   if (fill) ctx.fill();
   if (stroke) ctx.stroke();
 }
+
