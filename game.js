@@ -8,7 +8,6 @@ const WIDTH = canvas.width;
 const HEIGHT = canvas.height;
 
 const wallnutImage = new Image();
-wallnutImage.src = "https://plantsvszombies.fandom.com/wiki/Wall-nut?file=WallNutHD.png";
 
 let score = 0;
 let level = 1;
@@ -607,4 +606,3 @@ function start() {
 }
 
 window.addEventListener("load", start);
-
