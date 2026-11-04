@@ -21,13 +21,11 @@ function stayStill(brick) {
 // Move the entire row together, reversing at the canvas edges.
 function slide(brick) {
   const row = brick.motionGroup;
-  if (!row || row.bricks.length === 0 || row.lastUpdate === gameUpdateNumber) return;
+  if (!row || row.bricks.length === 0) return;
 
-  // The original leader can be destroyed, so discard removed bricks and let
-  // any surviving member of the group drive the movement instead.
+  // Remove destroyed bricks and let the first surviving member drive the row.
   row.bricks = row.bricks.filter(item => bricks.includes(item));
-  if (row.bricks.length === 0) return;
-  row.lastUpdate = gameUpdateNumber;
+  if (row.bricks.length === 0 || row.bricks[0] !== brick) return;
 
   const leftEdge = Math.min(...row.bricks.map(item => item.transform.x));
   const rightEdge = Math.max(...row.bricks.map(item => item.transform.x + item.transform.width));
@@ -165,8 +163,7 @@ function makeBricks() {
     const motionGroup = {
       bricks: movingRow,
       speed: MOVING_BRICK_SPEED,
-      direction: 1,
-      lastUpdate: -1
+      direction: 1
     };
     // Any surviving member can advance the shared row once per game update.
     for (const brick of movingRow) {
