@@ -8,7 +8,6 @@ const BRICK_HEIGHT = 20;
 const BRICK_GAP = 6;
 const BRICKS_TOP = 50;
 
-const MOVING_BRICK_ROW = 0;
 const MOVING_BRICK_SPEED = 1;
 
 // Special zombie variants
@@ -22,7 +21,13 @@ function stayStill(brick) {
 // Move the entire row together, reversing at the canvas edges.
 function slide(brick) {
   const row = brick.motionGroup;
-  if (!row || row.bricks.length === 0) return;
+  if (!row || row.bricks.length === 0 || row.lastUpdate === gameUpdateNumber) return;
+
+  // The original leader can be destroyed, so discard removed bricks and let
+  // any surviving member of the group drive the movement instead.
+  row.bricks = row.bricks.filter(item => bricks.includes(item));
+  if (row.bricks.length === 0) return;
+  row.lastUpdate = gameUpdateNumber;
 
   const leftEdge = Math.min(...row.bricks.map(item => item.transform.x));
   const rightEdge = Math.max(...row.bricks.map(item => item.transform.x + item.transform.width));
@@ -117,6 +122,7 @@ function makeBrick(x, y, type = 'default') {
 function makeBricks() {
   const list = [];
   const movingRow = [];
+  let movingRowIndex = null;
   const brickRows = getBrickRows();
   const totalWidth = BRICK_COLUMNS * BRICK_WIDTH + (BRICK_COLUMNS - 1) * BRICK_GAP;
   const left = (WIDTH - totalWidth) / 2;
@@ -143,7 +149,8 @@ function makeBricks() {
       );
 
       brick.startX = brick.transform.x;
-      if (row === MOVING_BRICK_ROW) movingRow.push(brick);
+      if (movingRowIndex === null) movingRowIndex = row;
+      if (row === movingRowIndex) movingRow.push(brick);
 
       brick.colorIndex = (row + col + pattern) % zombieColors.length;
       if (brickType === 'default') {
@@ -158,12 +165,15 @@ function makeBricks() {
     const motionGroup = {
       bricks: movingRow,
       speed: MOVING_BRICK_SPEED,
-      direction: 1
+      direction: 1,
+      lastUpdate: -1
     };
-    // The first brick advances the shared row once per game update.
-    movingRow[0].motionGroup = motionGroup;
-    movingRow[0].moveStrategy = slide;
-    movingRow[0].speed = MOVING_BRICK_SPEED;
+    // Any surviving member can advance the shared row once per game update.
+    for (const brick of movingRow) {
+      brick.motionGroup = motionGroup;
+      brick.moveStrategy = slide;
+      brick.speed = MOVING_BRICK_SPEED;
+    }
   }
 
   return list;
@@ -280,4 +290,3 @@ function roundRect(ctx, x, y, width, height, radius, fill, stroke) {
   if (fill) ctx.fill();
   if (stroke) ctx.stroke();
 }
-
