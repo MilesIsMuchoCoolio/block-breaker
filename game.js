@@ -7,8 +7,6 @@ const ctx = canvas.getContext("2d");
 const WIDTH = canvas.width;
 const HEIGHT = canvas.height;
 
-const wallnutImage = new Image();
-
 let score = 0;
 let level = 1;
 let isGameOver = false;
@@ -373,9 +371,21 @@ function addBallBurst(count, angleOffset = 0) {
   const baseAngle = Math.atan2(ball.transform.vy, ball.transform.vx) || 0;
   for (let i = 0; i < count; i++) {
     const offset = (i - (count - 1) / 2) * (Math.PI / 7) + angleOffset;
+    const angle = baseAngle + offset;
+    // Start the scattered balls slightly apart so they don't render as one ball.
+    const spread = (i - (count - 1) / 2) * (BALL_SIZE * 0.9);
+    const x = ball.transform.x + Math.cos(angle) * spread;
+    const y = ball.transform.y + Math.sin(angle) * spread;
     bonusBalls.push({
-      transform: createTransform(ball.transform.x, ball.transform.y, BALL_SIZE, BALL_SIZE,
-        Math.cos(baseAngle + offset) * speed, Math.sin(baseAngle + offset) * speed)
+      color: ["#F8D38A", "#77E8FF", "#FF8CCB", "#B8F28B", "#C5A3FF"][i % 5],
+      transform: createTransform(
+        Math.max(0, Math.min(WIDTH - BALL_SIZE, x)),
+        Math.max(0, Math.min(HEIGHT - BALL_SIZE, y)),
+        BALL_SIZE,
+        BALL_SIZE,
+        Math.cos(angle) * speed,
+        Math.sin(angle) * speed
+      )
     });
   }
 }
@@ -542,8 +552,21 @@ function drawPowerUps() {
 
 function drawBonusBalls() {
   for (const b of bonusBalls) {
-    ctx.fillStyle = "#FFF";
-    ctx.fillRect(b.transform.x, b.transform.y, b.transform.width, b.transform.height);
+    const t = b.transform;
+    const radius = Math.max(3, Math.min(t.width, t.height) / 2);
+    const cx = t.x + t.width / 2;
+    const cy = t.y + t.height / 2;
+    ctx.save();
+    ctx.shadowColor = "rgba(0, 0, 0, 0.75)";
+    ctx.shadowBlur = 4;
+    ctx.fillStyle = b.color || "#77E8FF";
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = "#17212B";
+    ctx.stroke();
+    ctx.restore();
   }
 }
 
@@ -553,13 +576,28 @@ function draw() {
   ctx.fillStyle = "#FFD700";
   ctx.fillRect(paddle.transform.x, paddle.transform.y, paddle.transform.width, paddle.transform.height);
 
-  if (wallnutImage.complete && wallnutImage.naturalHeight !== 0) {
-    ctx.drawImage(wallnutImage, ball.transform.x, ball.transform.y, ball.transform.width, ball.transform.height);
-  } else {
-    ctx.fillStyle = "#D2B48C";
-    ctx.fillRect(ball.transform.x, ball.transform.y, ball.transform.width, ball.transform.height);
-    ctx.strokeRect(ball.transform.x, ball.transform.y, ball.transform.width, ball.transform.height);
-  }
+  // Darker walnut brown with a bright edge and highlight so it stands out
+  // against the green background and remains visible among scatter balls.
+  const ballRadius = Math.max(3, Math.min(ball.transform.width, ball.transform.height) / 2);
+  const ballX = ball.transform.x + ball.transform.width / 2;
+  const ballY = ball.transform.y + ball.transform.height / 2;
+  const ballGradient = ctx.createRadialGradient(
+    ballX - ballRadius * 0.35, ballY - ballRadius * 0.4, 1,
+    ballX, ballY, ballRadius
+  );
+  ballGradient.addColorStop(0, "#C98A52");
+  ballGradient.addColorStop(1, "#6B351B");
+  ctx.fillStyle = ballGradient;
+  ctx.beginPath();
+  ctx.arc(ballX, ballY, ballRadius, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = "#FFF1C7";
+  ctx.stroke();
+  ctx.fillStyle = "rgba(255, 245, 220, 0.9)";
+  ctx.beginPath();
+  ctx.arc(ballX - ballRadius * 0.28, ballY - ballRadius * 0.3, Math.max(1.2, ballRadius * 0.2), 0, Math.PI * 2);
+  ctx.fill();
 
   drawBricks();
   drawBonusBalls();
