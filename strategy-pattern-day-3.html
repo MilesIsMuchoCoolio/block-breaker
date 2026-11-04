@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A 30-minute Grade 8 lesson tracing the Strategy Pattern in a brick-breaker game.">
+  <title>Strategy Pattern · Day 3: Trace the Swap</title>
+  <link rel="stylesheet" href="strategy-pattern-day-3.css">
+</head>
+<body>
+  <main class="lesson">
+    <header class="hero">
+      <p class="eyebrow">8th Grade · Wednesday, November 4, 2026 · 30-minute day</p>
+      <h1>Strategy Pattern · Day 3: Trace the Swap</h1>
+      <p class="tagline">Same loop. Different behavior.</p>
+      <section class="goal" aria-labelledby="goal-title">
+        <h2 id="goal-title">Today's goal</h2>
+        <p>By the end of class, I can trace how a brick uses its strategy each frame, and say what changes when I swap <code>slide</code> for <code>stayStill</code>.</p>
+      </section>
+    </header>
+
+    <section class="card" aria-labelledby="loop-title">
+      <p class="section-label">Read only · Thursday you'll add this loop to <code>update()</code></p>
+      <h2 id="loop-title">The loop in <code>update()</code></h2>
+      <p>It asks every brick to run its own strategy:</p>
+      <pre><code>for (const brick of bricks) {
+  brick.move(brick);   // runs slide OR stayStill
+}</code></pre>
+      <p>In the brick factory, each brick gets a strategy:</p>
+      <pre><code>move: slide,      speed: 2,   startX: x,   // the row that slides
+move: stayStill,  speed: 0,   startX: x,   // every other row</code></pre>
+      <aside class="key-rule">
+        <h3>The key rule</h3>
+        <p>The loop never changes. To change how a brick behaves, swap one word in the brick factory: <code>slide</code> or <code>stayStill</code>.</p>
+      </aside>
+    </section>
+
+    <section class="card" aria-labelledby="trace-title">
+      <p class="section-label">We do · Call out each number</p>
+      <h2 id="trace-title">Trace 2 bricks, 3 frames</h2>
+      <p>Brick A has <code>move: slide</code>; Brick B has <code>move: stayStill</code>. Both start at <code>x = 100</code>. In this trace, <code>slide</code> adds 2 to x each frame and <code>stayStill</code> leaves x unchanged.</p>
+      <div class="table-wrap">
+        <table>
+          <caption>Before the strategy swap</caption>
+          <thead><tr><th scope="col">Frame</th><th scope="col">Brick A (<code>slide</code>): x</th><th scope="col">Brick B (<code>stayStill</code>): x</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">start</th><td>100</td><td>100</td></tr>
+            <tr><th scope="row">1</th><td class="answer">?<span class="visually-hidden">Answer: 102</span></td><td class="answer">?<span class="visually-hidden">Answer: 100</span></td></tr>
+            <tr><th scope="row">2</th><td class="answer">?<span class="visually-hidden">Answer: 104</span></td><td class="answer">?<span class="visually-hidden">Answer: 100</span></td></tr>
+            <tr><th scope="row">3</th><td class="answer">?<span class="visually-hidden">Answer: 106</span></td><td class="answer">?<span class="visually-hidden">Answer: 100</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <button class="button" type="button" id="show-trace" aria-expanded="false" aria-controls="trace-result">Check the trace</button>
+      <p id="trace-result" class="result" hidden>Frame 1: A = 102, B = 100 · Frame 2: A = 104, B = 100 · Frame 3: A = 106, B = 100. Each frame, slide adds 2; stayStill keeps the same x.</p>
+    </section>
+
+    <section class="card swap-card" aria-labelledby="swap-title">
+      <p class="section-label">Now swap · Change Brick A's strategy</p>
+      <h2 id="swap-title">What happens when A uses <code>stayStill</code>?</h2>
+      <p>Brick A is now <code>stayStill</code>. It starts this trace at <code>x = 106</code>, where it ended. Brick B stays <code>stayStill</code> at <code>x = 100</code>.</p>
+      <div class="table-wrap">
+        <table>
+          <caption>After swapping Brick A to stayStill</caption>
+          <thead><tr><th scope="col">Frame</th><th scope="col">Brick A (<code>stayStill</code>): x</th><th scope="col">Brick B (<code>stayStill</code>): x</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">start</th><td>106</td><td>100</td></tr>
+            <tr><th scope="row">1</th><td>?</td><td>?</td></tr>
+            <tr><th scope="row">2</th><td>?</td><td>?</td></tr>
+            <tr><th scope="row">3</th><td>?</td><td>?</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p><strong>Think:</strong> What happens to A's x? Did the loop change?</p>
+      <button class="button button-secondary" type="button" id="show-swap" aria-expanded="false" aria-controls="swap-result">Reveal the swap trace</button>
+      <p id="swap-result" class="result" hidden>A stays at x = 106 on all three frames; B stays at x = 100. The loop did not change—only A's strategy changed from <code>slide</code> to <code>stayStill</code>.</p>
+    </section>
+
+    <section class="card" aria-labelledby="partner-title">
+      <p class="section-label">Partner check</p>
+      <h2 id="partner-title">Point, say, and check</h2>
+      <ul class="checklist">
+        <li><label><input type="checkbox"> Point to the one word you'd change to swap a brick's strategy.</label></li>
+        <li><label><input type="checkbox"> Point to the line in the loop that runs the strategy.</label></li>
+        <li><label><input type="checkbox"> Say what x does each frame for <code>slide</code>, and for <code>stayStill</code>.</label></li>
+      </ul>
+    </section>
+
+    <section class="card exit-ticket" aria-labelledby="exit-title">
+      <p class="section-label">Exit ticket · Submit on Google Classroom</p>
+      <h2 id="exit-title">What changes—and what stays the same?</h2>
+      <p>Answer in 1–2 sentences on Google Classroom. Use one of these sentence frames:</p>
+      <ul>
+        <li>When I swap to <code>stayStill</code>, the brick ___. The ___ stays the same.</li>
+        <li>Swapping changes ___ in the brick factory, but <code>update()</code> ___.</li>
+      </ul>
+      <label class="response-label" for="ticket-response">Draft your answer here, then copy it into Google Classroom:</label>
+      <textarea id="ticket-response" rows="3" placeholder="When I swap to stayStill, the brick…"></textarea>
+      <div class="ticket-actions">
+        <button class="button" type="button" id="copy-answer">Copy my answer</button>
+        <span id="copy-status" role="status" aria-live="polite"></span>
+        <button class="text-button" type="button" id="show-example" aria-expanded="false" aria-controls="example-answer">Show an example answer</button>
+      </div>
+      <p id="example-answer" class="example-answer" hidden>When I swap to <code>stayStill</code>, the brick's x stays the same each frame. The update loop stays the same; only the strategy assigned in the brick factory changes.</p>
+      <p class="classroom-note">This page can't submit to Google Classroom. Paste your 1–2 sentence response into the class assignment.</p>
+    </section>
+
+    <aside class="future">
+      <h2>Future engineer · Optional</h2>
+      <p>Using your row and speed from yesterday, write x for 5 frames. Success: 5 correct numbers. Why: you'll know exactly what to look for when you test Thursday.</p>
+    </aside>
+    <footer><p>Swap the strategy, not the loop.</p><a href="index.html">Back to the game</a></footer>
+  </main>
+  <script>
+    const reveal = (buttonId, resultId) => {
+      const button = document.getElementById(buttonId);
+      const result = document.getElementById(resultId);
+      button.addEventListener('click', () => {
+        result.hidden = !result.hidden;
+        button.setAttribute('aria-expanded', String(!result.hidden));
+      });
+    };
+    reveal('show-trace', 'trace-result');
+    reveal('show-swap', 'swap-result');
+    reveal('show-example', 'example-answer');
+
+    document.getElementById('show-trace').addEventListener('click', event => {
+      document.querySelectorAll('.answer').forEach(cell => {
+        cell.textContent = event.currentTarget.getAttribute('aria-expanded') === 'true'
+          ? cell.querySelector('.visually-hidden').textContent.replace('Answer: ', '')
+          : '?';
+      });
+    });
+
+    document.getElementById('copy-answer').addEventListener('click', async () => {
+      const answer = document.getElementById('ticket-response').value.trim();
+      const status = document.getElementById('copy-status');
+      if (!answer) {
+        status.textContent = 'Write your answer first.';
+        return;
+      }
+      try {
+        await navigator.clipboard.writeText(answer);
+        status.textContent = 'Copied. Paste it into Google Classroom.';
+      } catch {
+        status.textContent = 'Copy is unavailable here. Select your answer and copy it into Google Classroom.';
+      }
+    });
+  </script>
+</body>
+</html>
