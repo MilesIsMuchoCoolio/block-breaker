@@ -1,11 +1,170 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta http-equiv="refresh" content="0; url=index.html">
-  <title>Back to the game</title>
-</head>
-<body>
-  <p>This lesson page has been removed. <a href="index.html">Return to the game</a>.</p>
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Strategy Pattern: Trace the Swap</title>
+    <link rel="stylesheet" href="strategy-pattern-day-3.css" />
+  </head>
+  <body>
+    <main class="lesson">
+      <header class="hero">
+        <p class="eyebrow">Day 3 • Strategy Pattern</p>
+        <h1>Trace the Swap</h1>
+        <p class="tagline">Build flexible behavior by swapping strategies instead of rewriting the game logic.</p>
+
+        <div class="goal">
+          <h2>Goal</h2>
+          <p>
+            Learn how the <code>strategy</code> pattern lets an object choose a different behavior at runtime
+            without changing its core rules.
+          </p>
+        </div>
+      </header>
+
+      <section class="card">
+        <p class="section-label">The idea</p>
+        <h2>What changes?</h2>
+        <p>
+          Instead of hard-coding one movement rule into the paddle, the game keeps a reference to a current
+          strategy. The paddle says, “Use my current strategy,” and that strategy decides how to move.
+        </p>
+        <pre><code>const paddle = {
+  moveStrategy: moveLeftRight,
+  update() {
+    this.moveStrategy(this);
+  }
+};</code></pre>
+      </section>
+
+      <section class="card">
+        <h2>Trace the swap</h2>
+        <p>
+          When the player changes the way the paddle should act, the game swaps the strategy instead of rewriting the
+          whole paddle class.
+        </p>
+
+        <div class="table-wrap">
+          <table>
+            <caption>How the behavior changes</caption>
+            <thead>
+              <tr>
+                <th>Situation</th>
+                <th>Current Strategy</th>
+                <th>Result</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th>Basic play</th>
+                <td>Move normally</td>
+                <td>Paddle follows arrow keys with steady movement.</td>
+              </tr>
+              <tr>
+                <th>Boosted mode</th>
+                <td>Speed-up strategy</td>
+                <td>The same paddle responds faster for a short time.</td>
+              </tr>
+              <tr>
+                <th>Special effect</th>
+                <td>Heat-seeking or scatter strategy</td>
+                <td>The behavior shifts without changing the rest of the game loop.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Why this is useful</h2>
+        <p>
+          The strategy pattern helps the game keep one object, like the paddle, while changing how it acts based on
+          power-ups, level changes, or player input.
+        </p>
+
+        <ul class="checklist">
+          <li>
+            <label>
+              <input type="checkbox" />
+              <span>The game code stays organized because each behavior is in its own strategy.</span>
+            </label>
+          </li>
+          <li>
+            <label>
+              <input type="checkbox" />
+              <span>New behaviors can be added without copying lots of if/else statements.</span>
+            </label>
+          </li>
+          <li>
+            <label>
+              <input type="checkbox" />
+              <span>The object can switch behavior at runtime when the game state changes.</span>
+            </label>
+          </li>
+        </ul>
+      </section>
+
+      <section class="key-rule">
+        <h3>Key rule</h3>
+        <p>
+          A class should depend on an interface or shared behavior, not on one exact movement rule. That way, the
+          strategy can change while the system keeps working.
+        </p>
+      </section>
+
+      <section class="card exit-ticket">
+        <h2>Exit Slip</h2>
+        <p>Complete each sentence with a short, thoughtful answer.</p>
+
+        <label class="response-label" for="exit-1">1. The strategy pattern helps by ________.</label>
+        <textarea id="exit-1" placeholder="Type your answer..."></textarea>
+
+        <label class="response-label" for="exit-2">2. In this game, the paddle changes behavior by ________.</label>
+        <textarea id="exit-2" placeholder="Type your answer..."></textarea>
+
+        <label class="response-label" for="exit-3">3. One benefit of using strategies is ________.</label>
+        <textarea id="exit-3" placeholder="Type your answer..."></textarea>
+
+        <div class="ticket-actions">
+          <button class="button" id="copy-exit-slip" type="button">Copy my answers</button>
+          <button class="text-button" id="clear-exit-slip" type="button">Clear</button>
+          <span id="copy-status" aria-live="polite"></span>
+        </div>
+
+        <p class="classroom-note">Tip: Use complete sentences and mention the behavior being swapped.</p>
+      </section>
+
+      <footer>
+        <p>Strategy Pattern • Trace the Swap</p>
+        <a href="index.html">Back to the game</a>
+      </footer>
+    </main>
+
+    <script>
+      const exitFields = Array.from(document.querySelectorAll('textarea'));
+      const copyButton = document.getElementById('copy-exit-slip');
+      const clearButton = document.getElementById('clear-exit-slip');
+      const copyStatus = document.getElementById('copy-status');
+
+      copyButton.addEventListener('click', async () => {
+        const text = exitFields
+          .map((field, index) => `${index + 1}. ${field.value.trim() || '________'}`)
+          .join('\n\n');
+
+        try {
+          await navigator.clipboard.writeText(text);
+          copyStatus.textContent = 'Copied!';
+        } catch (error) {
+          copyStatus.textContent = 'Copy failed. Please select and copy manually.';
+        }
+      });
+
+      clearButton.addEventListener('click', () => {
+        exitFields.forEach((field) => {
+          field.value = '';
+        });
+        copyStatus.textContent = 'Cleared';
+      });
+    </script>
+  </body>
 </html>
