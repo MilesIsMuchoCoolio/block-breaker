@@ -1,4 +1,11 @@
 function handleBrickImpact(brick, brickIndex, brickTransform) {
+  triggerScreenShake(brick.maxHits > 1 ? 4 : 7);
+  spawnGameParticles(
+    brickTransform.x + brickTransform.width / 2,
+    brickTransform.y + brickTransform.height / 2,
+    brick.color || "#FFD166",
+    brick.maxHits > 1 && brick.hits > 1 ? 7 : 16
+  );
   const hasMultiHit = Number.isFinite(brick?.hits) && Number.isFinite(brick?.maxHits) && brick.maxHits > 1;
 
   if (hasMultiHit) {
